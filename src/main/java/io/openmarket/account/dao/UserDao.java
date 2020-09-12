@@ -1,0 +1,12 @@
+package io.openmarket.account.dao;
+
+
+import io.openmarket.account.model.Account;
+import io.openmarket.dao.dynamodb.DynamoDBDao;
+
+import java.util.Optional;
+
+public interface UserDao extends DynamoDBDao<Account> {
+
+
+}
