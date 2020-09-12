@@ -22,7 +22,11 @@ public abstract class AbstractDynamoDBDao<T> implements DynamoDBDao<T> {
     }
 
     public Optional<T> load(final Class<T> objType, final String key) {
-        return Optional.of(dbMapper.load(objType, key));
+        final T obj = dbMapper.load(objType, key);
+        if (obj != null) {
+            return Optional.of(obj);
+        }
+        return Optional.empty();
     }
 
     public void save(final T obj) {

@@ -21,6 +21,11 @@ version '1.0-SNAPSHOT'
 repositories {
     mavenCentral()
     jcenter()
+
+    maven {
+        name "DynamoDB Local Release Repository - US West (Oregon) Region"
+        url "https://s3-us-west-2.amazonaws.com/dynamodb-local/release"
+    }
 }
 
 dependencies {
@@ -55,14 +60,22 @@ dependencies {
 
     implementation("com.google.guava:guava:29.0-jre")
 
-    testCompile group: 'junit', name: 'junit', version: '4.12'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.3.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.3.1'
     testCompile "org.mockito:mockito-core:2.+"
+
 
     compile 'io.jsonwebtoken:jjwt-api:0.11.2'
     runtime 'io.jsonwebtoken:jjwt-impl:0.11.2',
             // Uncomment the next line if you want to use RSASSA-PSS (PS256, PS384, PS512) algorithms:
             //'org.bouncycastle:bcprov-jdk15on:1.60',
             'io.jsonwebtoken:jjwt-jackson:0.11.2' // or 'io.jsonwebtoken:jjwt-gson:0.11.2' for gson
+
+    // https://mvnrepository.com/artifact/com.amazonaws/DynamoDBLocal
+    testCompile group: 'com.amazonaws', name: 'DynamoDBLocal', version: '1.13.3'
+    testCompile group: 'com.almworks.sqlite4java', name: 'sqlite4java', version: '0.282'
+
+
 }
 
 protobuf {
@@ -134,9 +147,11 @@ task coverage {
 }
 
 test {
+    useJUnitPlatform()
     jacoco {
         excludes = excludeFromCoverage
     }
+    systemProperty("sqlite4java.library.path", "lib")
 }
 
 test.finalizedBy jacocoTestReport
