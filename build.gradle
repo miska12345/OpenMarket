@@ -75,11 +75,12 @@ dependencies {
             //'org.bouncycastle:bcprov-jdk15on:1.60',
             'io.jsonwebtoken:jjwt-jackson:0.11.2' // or 'io.jsonwebtoken:jjwt-gson:0.11.2' for gson
 
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.3.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.3.1'
+    testCompile "org.mockito:mockito-core:2.+"
     // https://mvnrepository.com/artifact/com.amazonaws/DynamoDBLocal
     testCompile group: 'com.amazonaws', name: 'DynamoDBLocal', version: '1.13.3'
     testCompile group: 'com.almworks.sqlite4java', name: 'sqlite4java', version: '0.282'
-
-
 }
 
 protobuf {
