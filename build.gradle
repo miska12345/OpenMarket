@@ -88,7 +88,7 @@ idea {
 
 // Define the packages that should be excluded from JaCoCo.
 // For example, to exclude a package called 'a', add '**/a/**'.
-def excludeFromCoverage = []
+def excludeFromCoverage = ['**/model/*', '**/dao/*']
 
 jacocoTestReport {
     reports {
