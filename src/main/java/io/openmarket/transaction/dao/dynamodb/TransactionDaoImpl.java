@@ -1,4 +1,4 @@
-package io.openmarket.transaction.dao;
+package io.openmarket.transaction.dao.dynamodb;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
@@ -20,7 +20,14 @@ public class TransactionDaoImpl extends AbstractDynamoDBDao<Transaction> impleme
     }
 
     @Override
-    protected boolean validate(final Transaction obj) {
-        return true;
+    protected boolean validate(final Transaction transaction) {
+        return transaction.getTransactionId() != null
+                && !transaction.getTransactionId().isEmpty()
+                && transaction.getAmount() > 0
+                && transaction.getCurrencyId() != null
+                && !transaction.getCurrencyId().isEmpty()
+                && transaction.getPayerId() != null
+                && transaction.getRecipientId() != null
+                && transaction.getStatus() != null;
     }
 }

@@ -55,6 +55,11 @@ public final class TransactionConfig {
     public static final String TRANSACTION_DDB_ATTRIBUTE_STATUS = "Status";
 
     /**
+     * The DDB attribute name for error status.
+     */
+    public static final String TRANSACTION_DDB_ATTRIBUTE_ERROR_STATUS = "ErrorStatus";
+
+    /**
      * The DDB attribute name for the timestamp of when this transaction was created.
      */
     public static final String TRANSACTION_DDB_ATTRIBUTE_CREATED_AT = "CreatedAt";
