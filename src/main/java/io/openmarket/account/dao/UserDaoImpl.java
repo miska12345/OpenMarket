@@ -52,7 +52,8 @@ public class UserDaoImpl extends AbstractDynamoDBDao<Account> implements UserDao
     }
 
     public int getCount (){
-        QueryRequest
+//        QueryRequest
+        return 0;
     }
 
     public Optional<String> login(String username, byte[] password) {

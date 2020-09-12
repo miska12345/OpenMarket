@@ -14,11 +14,16 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 public class HelloWorldTest {
-    @Test
-    public void testHello() {
-        assertEquals("Hello!", new HelloWorld().sayHello());
-    }
+    private static AmazonDynamoDBLocal localDBClient;
+    private AmazonDynamoDB dbClient;
+    private DynamoDBMapper dbMapper;
+    private TransactionDaoImpl transactionDao;
 
+    @BeforeAll
+    public static void setupLocalDB() {
+        localDBClient = DynamoDBEmbedded.create();
+        createTable();
+    }
 
 
     @Test
