@@ -1,4 +1,4 @@
-package io.openmarket.account.dao;
+package io.openmarket.account.dao.dynamodb;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
@@ -10,8 +10,10 @@ import io.openmarket.account.model.Account;
 import io.openmarket.dao.dynamodb.AbstractDynamoDBDao;
 
 import javax.inject.Inject;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import static io.openmarket.config.AccountConfig.*;
 
 public class UserDaoImpl extends AbstractDynamoDBDao<Account> implements UserDao {
 
@@ -25,7 +27,17 @@ public class UserDaoImpl extends AbstractDynamoDBDao<Account> implements UserDao
 
     @Override
     protected boolean validate(Account obj) {
-        return false;
+
+       if (obj.getUsername().equals(null) || obj.getUsername().length() > ACCOUNT_USERNAME_LENGTH_LIMIT) {
+           return false;
+       } else if (obj.getCreateAt().equals(null)) {
+           return false;
+       }
+       //TODO MUST ADD THIS BACK IT IS NOW DISABLED FOR DEBUGGING.
+//       } else if (obj.getPasswordHash().equals(null)) {
+//           return false;
+//       }
+       return true;
     }
 
 
@@ -47,11 +59,15 @@ public class UserDaoImpl extends AbstractDynamoDBDao<Account> implements UserDao
         Map<String, AttributeValue> value = ImmutableMap.of(":a", new AttributeValue(username));
 
 
-        PaginatedList<Account> result = this.getDbMapper().query(Account.class, new DynamoDBQueryExpression<Account>()
+        List<Account> result = this.getDbMapper().query(Account.class, new DynamoDBQueryExpression<Account>()
                 .withExpressionAttributeNames(NAME)
                 .withExpressionAttributeValues(value)
                 .withKeyConditionExpression(KEY_EXPRESSION_USER)
                 .withProjectionExpression(projection).withLimit(1));
+
+        if (result.size() < 1) {
+            return Optional.empty();
+        }
 
         return Optional.of(result.get(0));
 

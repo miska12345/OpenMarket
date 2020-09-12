@@ -1,4 +1,4 @@
-package io.openmarket.account.dao;
+package io.openmarket.account.dao.dynamodb;
 
 
 import io.openmarket.account.model.Account;

@@ -1,6 +1,6 @@
 package io.openmarket.account.service;
 
-import io.openmarket.account.dao.UserDao;
+import io.openmarket.account.dao.dynamodb.UserDao;
 import io.openmarket.account.grpc.AccountService;
 import io.openmarket.account.model.Account;
 
@@ -14,11 +14,12 @@ import java.util.Random;
 
 public final class AccountServiceHandler {
 
-    @Inject
-    UserDao userDao;
+    private final UserDao userDao;
 
     @Inject
-    public AccountServiceHandler() {}
+    public AccountServiceHandler(UserDao userDao) {
+        this.userDao = userDao;
+    }
 
 
     public AccountService.RegistrationResult register(AccountService.RegistrationRequest request) {
@@ -40,6 +41,8 @@ public final class AccountServiceHandler {
         Account newUser = Account.builder().username(username)
                 .passwordHash(hashedPass).createAt(Instant.now().toString()).displayName(displayName).build();
        this.userDao.save(newUser);
+
+       return null;
     }
 
     /****************************

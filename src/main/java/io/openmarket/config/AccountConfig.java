@@ -18,6 +18,9 @@ public class AccountConfig {
      */
     public static final String USER_DDB_ATTRIBUTE_ID = "UserId";
 
+    public static final String USER_DDB_ATTRIBUTE_USERNAME = "username";
+
+    public static final int ACCOUNT_USERNAME_LENGTH_LIMIT = 255;
     /**
      * The DDB attribute name for transaction type.
      */
