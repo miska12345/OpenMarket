@@ -6,7 +6,8 @@ import io.openmarket.dao.dynamodb.DynamoDBDao;
 
 import java.util.Optional;
 
-public interface UserDao extends DynamoDBDao<Account> {
 
+public interface UserDao extends DynamoDBDao<Account> {
+    public Optional<Account> getUser(String username, String projection);
 
 }
