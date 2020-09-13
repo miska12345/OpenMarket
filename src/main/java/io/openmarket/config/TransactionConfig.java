@@ -1,5 +1,8 @@
 package io.openmarket.config;
 
+import io.openmarket.transaction.model.TransactionErrorType;
+import io.openmarket.transaction.model.TransactionStatus;
+
 public final class TransactionConfig {
     private TransactionConfig() {}
 
@@ -68,4 +71,26 @@ public final class TransactionConfig {
      * The DDB attribute name for for the timestamp of when this transaction was last modified.
      */
     public static final String TRANSACTION_DDB_ATTRIBUTE_UPDATED_AT = "UpdatedAt";
+
+    /**
+     * The DDB index name for payerId to transactionIds.
+     */
+    public static final String TRANSACTION_DDB_INDEX_NAME = String.format("%s-%s-index",
+            TRANSACTION_DDB_ATTRIBUTE_PAYER_ID, TRANSACTION_DDB_ATTRIBUTE_CREATED_AT);
+
+    /**
+     * ------------------------------------------------------
+     * Transaction Initial Values.
+     * ------------------------------------------------------
+     */
+
+    /**
+     * The default transaction status for new transactions.
+     */
+    public static TransactionStatus TRANSACTION_INITIAL_STATUS = TransactionStatus.PENDING;
+
+    /**
+     * The default transaction error status for new transactions.
+     */
+    public static TransactionErrorType TRANSACTION_INITIAL_ERROR_TYPE = TransactionErrorType.NONE;
 }

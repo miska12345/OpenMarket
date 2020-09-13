@@ -8,18 +8,18 @@ import com.amazonaws.services.dynamodbv2.model.*;
 import com.google.common.collect.ImmutableList;
 import io.openmarket.transaction.model.Transaction;
 import io.openmarket.transaction.model.TransactionStatus;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import io.openmarket.transaction.utils.TransactionUtils;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
-import java.util.Optional;
+import java.util.*;
 
-import static io.openmarket.config.TransactionConfig.TRANSACTION_DDB_ATTRIBUTE_ID;
-import static io.openmarket.config.TransactionConfig.TRANSACTION_DDB_TABLE_NAME;
+import static io.openmarket.config.TransactionConfig.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TransactionDaoImplTest {
+    private static final String PAYER_ID = "123";
     private static AmazonDynamoDBLocal localDBClient;
     private AmazonDynamoDB dbClient;
     private DynamoDBMapper dbMapper;
@@ -28,7 +28,6 @@ public class TransactionDaoImplTest {
     @BeforeAll
     public static void setupLocalDB() {
         localDBClient = DynamoDBEmbedded.create();
-        createTable();
     }
 
     @BeforeEach
@@ -36,6 +35,12 @@ public class TransactionDaoImplTest {
         dbClient = localDBClient.amazonDynamoDB();
         dbMapper = new DynamoDBMapper(dbClient);
         transactionDao = new TransactionDaoImpl(dbClient, dbMapper);
+        createTable();
+    }
+
+    @AfterEach
+    public void reset() {
+        dbClient.deleteTable(TRANSACTION_DDB_TABLE_NAME);
     }
 
     @Test
@@ -71,15 +76,71 @@ public class TransactionDaoImplTest {
         assertFalse(opTransaction.isPresent());
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 5})
+    public void can_Load_All_Transactions_For_Payer(int count) {
+        Map<String, Transaction> transactionMap = new HashMap<>();
+        for (int i = 0; i < count; i++) {
+            Transaction transaction = generateRandomTransaction();
+            transactionMap.put(transaction.getTransactionId(), transaction);
+            transactionDao.save(transaction);
+        }
+        Set<Transaction> result = new HashSet<>();
+        transactionDao.getTransactionForPayer(PAYER_ID, result, null);
+        assertEquals(transactionMap.size(), result.size());
+
+        for (Transaction tran : result) {
+            assertTrue(transactionMap.containsKey(tran.getTransactionId()));
+        }
+    }
+
+    @Test
+    public void cannot_Load_Transaction_For_Invalid_Payer() {
+        Set<Transaction> result = new HashSet<>();
+        transactionDao.getTransactionForPayer("1", result, null);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void do_Throw_IllegalArgumentException_If_Negative_Amount() {
+        Transaction transaction = Transaction.builder().transactionId("123").payerId("123").status(TransactionStatus.PENDING)
+                .recipientId("123").amount(-1.23).currencyId("123").build();
+        assertThrows(IllegalArgumentException.class, () -> transactionDao.save(transaction));
+    }
+
     @AfterAll
     public static void teardown() {
         localDBClient.shutdown();
     }
 
+    private Transaction generateRandomTransaction() {
+        return Transaction.builder().transactionId(TransactionUtils.generateTransactionID())
+                .payerId(PAYER_ID)
+                .status(TransactionStatus.PENDING)
+                .recipientId("123")
+                .amount(3.14)
+                .currencyId("123")
+                .build();
+    }
+
     private static void createTable() {
+        ProvisionedThroughput throughput = new ProvisionedThroughput(5L, 5L);
         localDBClient.amazonDynamoDB().createTable(new CreateTableRequest().withTableName(TRANSACTION_DDB_TABLE_NAME)
                 .withKeySchema(ImmutableList.of(new KeySchemaElement(TRANSACTION_DDB_ATTRIBUTE_ID, KeyType.HASH)))
-                .withAttributeDefinitions(new AttributeDefinition(TRANSACTION_DDB_ATTRIBUTE_ID, ScalarAttributeType.S))
-                .withProvisionedThroughput(new ProvisionedThroughput(5L, 5L)));
+                .withAttributeDefinitions(new AttributeDefinition(TRANSACTION_DDB_ATTRIBUTE_ID, ScalarAttributeType.S),
+                        new AttributeDefinition(TRANSACTION_DDB_ATTRIBUTE_PAYER_ID, ScalarAttributeType.S),
+                        new AttributeDefinition(TRANSACTION_DDB_ATTRIBUTE_CREATED_AT, ScalarAttributeType.S))
+                .withGlobalSecondaryIndexes(new GlobalSecondaryIndex()
+                        .withIndexName(TRANSACTION_DDB_INDEX_NAME)
+                        .withKeySchema(new KeySchemaElement()
+                                        .withAttributeName(TRANSACTION_DDB_ATTRIBUTE_PAYER_ID)
+                                        .withKeyType(KeyType.HASH),
+                                new KeySchemaElement()
+                                        .withKeyType(KeyType.RANGE)
+                                        .withAttributeName(TRANSACTION_DDB_ATTRIBUTE_CREATED_AT))
+                        .withProjection(new Projection().withProjectionType(ProjectionType.INCLUDE)
+                                .withNonKeyAttributes(TRANSACTION_DDB_ATTRIBUTE_ID))
+                        .withProvisionedThroughput(throughput))
+                .withProvisionedThroughput(throughput));
     }
 }

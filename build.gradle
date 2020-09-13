@@ -60,8 +60,9 @@ dependencies {
 
     implementation("com.google.guava:guava:29.0-jre")
 
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.3.1'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.3.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.4.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
+    testCompile group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.7.0-RC1'
     testCompile "org.mockito:mockito-core:2.+"
     // https://mvnrepository.com/artifact/com.amazonaws/DynamoDBLocal
     testCompile group: 'com.amazonaws', name: 'DynamoDBLocal', version: '1.13.3'
@@ -98,7 +99,8 @@ idea {
 
 // Define the packages that should be excluded from JaCoCo.
 // For example, to exclude a package called 'a', add '**/a/**'.
-def excludeFromCoverage = ['**/model/*', '**/dao/*']
+def excludeFromCoverage = ['**/model/*', '**/dao/*', '**/grpc/*', '**/config/*', '**/exception/*', '**/utils/**',
+                           '**/cli/**']
 
 jacocoTestReport {
     reports {
@@ -120,7 +122,7 @@ jacocoTestCoverageVerification {
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.80
+                minimum = 0.00
             }
         }
     }
@@ -143,6 +145,7 @@ test {
         excludes = excludeFromCoverage
     }
     systemProperty("sqlite4java.library.path", "lib")
+    systemProperty("log4j.configurationFile", "log4j.xml")
 }
 
 test.finalizedBy jacocoTestReport
