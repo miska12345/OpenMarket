@@ -7,10 +7,7 @@ import com.amazonaws.services.dynamodbv2.local.shared.access.AmazonDynamoDBLocal
 import com.amazonaws.services.dynamodbv2.model.*;
 import com.google.common.collect.ImmutableList;
 import io.openmarket.account.model.Account;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -78,5 +75,6 @@ public class UserDaoImplTest {
                 .withAttributeDefinitions(new AttributeDefinition(USER_DDB_ATTRIBUTE_USERNAME, ScalarAttributeType.S))
                 .withProvisionedThroughput(new ProvisionedThroughput(5L, 5L)));
     }
+
 }
 
