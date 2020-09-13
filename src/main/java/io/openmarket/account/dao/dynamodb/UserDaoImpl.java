@@ -6,6 +6,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.PaginatedList;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.google.common.collect.ImmutableMap;
+import io.openmarket.account.dao.dynamodb.UserDao;
 import io.openmarket.account.model.Account;
 import io.openmarket.dao.dynamodb.AbstractDynamoDBDao;
 
