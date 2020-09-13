@@ -1,5 +1,6 @@
 package io.openmarket.account.dao;
 
+import io.openmarket.account.dao.dynamodb.UserDao;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
@@ -10,6 +11,7 @@ import com.google.common.collect.ImmutableMap;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+
 import io.openmarket.account.model.Account;
 import io.openmarket.dao.dynamodb.AbstractDynamoDBDao;
 import javax.crypto.SecretKey;
@@ -50,7 +52,6 @@ public class UserDaoImpl extends AbstractDynamoDBDao<Account> implements UserDao
         return Optional.empty();
 
     }
-
     public int getCount (){
 //        QueryRequest
         return 0;
@@ -70,6 +71,10 @@ public class UserDaoImpl extends AbstractDynamoDBDao<Account> implements UserDao
         SecretKey key = Keys.hmacShaKeyFor(username.getBytes(StandardCharsets.UTF_8));
         JwtBuilder jws = Jwts.builder().setSubject(username).signWith(key);
         return Optional.of(jws.compact());
+    }
 
+    @Override
+    public Optional<Account> getUser(String username, String projection) {
+        return Optional.empty();
     }
 }
