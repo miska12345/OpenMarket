@@ -9,9 +9,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.Random;
 import io.openmarket.account.grpc.AccountService.*;
-import lombok.extern.log4j.Log4j;
+import lombok.extern.log4j.Log4j2;
 
-//@Log4j
+@Log4j2
 public final class AccountServiceHandler {
 
     private final UserDao userDao;
@@ -25,6 +25,7 @@ public final class AccountServiceHandler {
 
     public LoginResult login(LoginRequest loginRequest) {
         if (loginRequest.getUsername().isEmpty() || loginRequest.getPassword().isEmpty()) {
+            log.info("Reqeuset contains invalid param");
             return LoginResult.newBuilder().setLoginStatus(LoginResult.Status.LOGIN_FAIL_INVALID_PARAM).build();
         }
         String username = loginRequest.getUsername();
@@ -33,6 +34,7 @@ public final class AccountServiceHandler {
 
         if (!potentialUser.isPresent()) {
             //Todo set this to a new status call user not found
+            log.info("User " + username + " is not found");
             return LoginResult.newBuilder().setLoginStatus(LoginResult.Status.LOGIN_FAIL_INCORRECT_PASSWORD_OR_USERNAME)
                     .build();
         }
@@ -43,12 +45,14 @@ public final class AccountServiceHandler {
         String submittedPasswd = hash(password, salt);
 
         if (!passwd.equals(submittedPasswd)) {
+            log.info("Login failed due to incorrect password or username");
             return LoginResult.newBuilder().setLoginStatus(LoginResult.Status.LOGIN_FAIL_INCORRECT_PASSWORD_OR_USERNAME)
                     .build();
         }
 
         String token = credentialManager.generateToken(user.getUsername());
 
+        log.info("User " + username + "logged in with token" + token);
         return LoginResult.newBuilder().setUsername(user.getUsername()).setLoginStatus(LoginResult.Status.LOGIN_SUCCESS)
                 .setCred(token).build();
     }
@@ -56,16 +60,18 @@ public final class AccountServiceHandler {
     public AccountService.RegistrationResult register(AccountService.RegistrationRequest request) {
         if (request == null) throw new NullPointerException();
 
-        if (request.getPassword().equals(null) || request.getPassword().isEmpty()
-            || request.getDisplayName().equals(null) || request.getDisplayName().isEmpty()
+        if (request.getPassword().isEmpty() || request.getDisplayName().isEmpty()
             ||request.getUsername().isEmpty()){
+            log.info("Registration failed due to invalid parameter");
             return AccountService.RegistrationResult.newBuilder()
                     .setRegisterStatus(AccountService.RegistrationResult.Status.INVALID_PARAM).build();
         }
 
         Optional<Account> chekcDuplicate = userDao.load(request.getUsername());
+
         //user name already taken
         if (chekcDuplicate.isPresent()) {
+            log.info("Registration failed because username " + request.getUsername() + "is taken");
             return AccountService.RegistrationResult.newBuilder()
                     .setRegisterStatus(AccountService.RegistrationResult.Status.USERNAME_ALREADY_EXIST).build();
         }
@@ -80,6 +86,7 @@ public final class AccountServiceHandler {
                 .displayName(displayName).build();
         this.userDao.save(newUser);
 
+        log.info("Registration completed, welcome " + username);
         return AccountService.RegistrationResult.newBuilder()
                .setRegisterStatus(AccountService.RegistrationResult.Status.REGISTER_SUCCESS)
                .build();

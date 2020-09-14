@@ -9,6 +9,7 @@ import io.openmarket.config.AccountConfig;
 import lombok.AccessLevel;
 import lombok.Getter;
 import javax.inject.Inject;
+import java.util.Date;
 
 public final class CredentialManager {
     @Getter(AccessLevel.PROTECTED)
@@ -32,7 +33,7 @@ public final class CredentialManager {
     }
 
     public String generateToken(String username) {
-        return JWT.create().withIssuer(username).sign(serverKey);
+        return JWT.create().withIssuer(username).withIssuedAt(new Date()).sign(serverKey);
     }
 
 

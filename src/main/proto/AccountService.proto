@@ -34,3 +34,11 @@ message RegistrationResult {
 
     Status registerStatus = 1;
 }
+
+service Login {
+    rpc handleLogin(LoginRequest) returns (LoginResult) {}
+}
+
+service Register {
+    rpc handleRegister(RegistrationRequest) returns (RegistrationResult) {}
+}
