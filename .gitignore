@@ -26,9 +26,9 @@ hs_err_pid*
 src/generated/
 
 # IntelliJ
-.DS_Store
-.iml
-.idea
+*.DS_Store
+*.iml
+*.idea
 
 # Gradle
 .gradle
