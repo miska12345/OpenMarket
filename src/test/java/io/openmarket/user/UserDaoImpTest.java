@@ -32,16 +32,9 @@ public class UserDaoImpTest {
         createTable();
     }
 
-    @Test
-    public void cannot_Load_If_Not_Exists() {
-        Optional<Account> opUser = userDao.load("123");
-        assertFalse(opUser.isPresent());
-    }
 
-    @Test
-    public void addUser() {
-        userDao.save(Account.builder().userId("yo").passwordHash("saoijds".getBytes()).passwordSalt("osdijodi".getBytes()).build());
-    }
+
+
 
     @Test
     public void verify() {
