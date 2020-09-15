@@ -85,6 +85,7 @@ public class OrgDaoImplTest {
         assertEquals(testOrg.getOrgDescription(), org.getOrgDescription());
     }
 
+
     @Test
     public void cannot_Load_If_Not_Exists() {
         Optional<Organization> opTransaction = orgDao.load("123");

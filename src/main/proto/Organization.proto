@@ -1,1 +1,26 @@
 syntax = "proto3";
+
+package organization;
+
+service Organization {
+//  rpc addOrganization (orgMetadata) return (){}
+//  rpc getOrganization (name){}
+}
+
+
+
+
+message orgMetadataResult {
+  string orgName = 1;
+}
+
+message orgMetadata {
+  string orgName = 1;
+  string orgDescription = 2;
+  string orgOwnerId = 3;
+  string orgSlogan = 4;
+  string orgPortraitS3Key = 5;
+  repeated string orgCurrencies = 6;
+}
+
+
