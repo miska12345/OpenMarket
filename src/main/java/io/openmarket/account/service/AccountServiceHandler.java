@@ -1,15 +1,17 @@
 package io.openmarket.account.service;
+
 import com.google.common.hash.Hashing;
-import io.openmarket.account.dao.dynamodb.UserDao;
-import io.openmarket.account.grpc.AccountService;
+import io.openmarket.account.dynamodb.UserDao;
 import io.openmarket.account.model.Account;
+import io.openmarket.accountx.grpc.AccountService;
+import io.openmarket.accountx.grpc.AccountService.LoginRequest;
+import io.openmarket.accountx.grpc.AccountService.LoginResult;
+import lombok.extern.log4j.Log4j2;
 
 import javax.inject.Inject;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.Random;
-import io.openmarket.account.grpc.AccountService.*;
-import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public final class AccountServiceHandler {

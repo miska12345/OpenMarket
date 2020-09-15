@@ -4,11 +4,15 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.local.embedded.DynamoDBEmbedded;
 import com.amazonaws.services.dynamodbv2.local.shared.access.AmazonDynamoDBLocal;
-import com.amazonaws.services.dynamodbv2.model.*;
-import com.auth0.jwt.algorithms.Algorithm;
-import com.google.common.collect.ImmutableList;
-import io.openmarket.account.dao.dynamodb.UserDao;
-import io.openmarket.account.dao.dynamodb.UserDaoImpl;
+import com.amazonaws.services.dynamodbv2.model.AttributeDefinition;
+import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
+import com.amazonaws.services.dynamodbv2.model.DeleteTableRequest;
+import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
+import com.amazonaws.services.dynamodbv2.model.KeyType;
+import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughput;
+import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType;
+import io.openmarket.account.dynamodb.UserDao;
+import io.openmarket.account.dynamodb.UserDaoImpl;
 import io.openmarket.account.service.AccountServiceHandler;
 import io.openmarket.account.service.CredentialManager;
 import org.junit.jupiter.api.AfterAll;
@@ -16,7 +20,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 
-import static io.openmarket.config.AccountConfig.*;
+import static io.openmarket.config.AccountConfig.USER_DDB_ATTRIBUTE_USERNAME;
+import static io.openmarket.config.AccountConfig.USER_DDB_TABLE_NAME;
 
 public class AccountTestTemplateLocalDB {
     protected static AmazonDynamoDBLocal localDBClient;

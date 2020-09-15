@@ -1,6 +1,5 @@
 package io.openmarket.account.service;
 
-import com.auth0.jwt.algorithms.Algorithm;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

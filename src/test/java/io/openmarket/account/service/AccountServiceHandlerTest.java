@@ -1,24 +1,16 @@
 package io.openmarket.account.service;
 
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
-import io.openmarket.account.AccountTestTemplateLocalDB;
-import io.openmarket.account.dao.dynamodb.UserDao;
-import io.openmarket.account.dao.dynamodb.UserDaoImpl;
-import io.openmarket.account.grpc.AccountService;
 import io.openmarket.account.model.Account;
-import org.junit.jupiter.api.BeforeEach;
+import io.openmarket.account.AccountTestTemplateLocalDB;
+import io.openmarket.accountx.grpc.AccountService;
 import org.junit.jupiter.api.Test;
 
-import javax.servlet.Registration;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 
 public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
-
-
-
     @Test
     public void can_Register_when_user_not_exist() {
         ash.register(AccountService.RegistrationRequest.newBuilder().setUsername("weifeng1")
@@ -46,7 +38,6 @@ public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
 
         assertEquals(AccountService.RegistrationResult.Status.INVALID_PARAM, result.getRegisterStatus());
     }
-
 
     @Test
     public void cannot_Register_when_username_empty_or_null() {
