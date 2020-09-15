@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+option java_package = "io.openmarket.transaction.grpc";
+option java_outer_classname = "TransactionProto";
+
+package transaction;
+
+service Transaction {
+  rpc processPayment (PaymentRequest) returns (PaymentResult) {}
+  rpc processQuery (QueryRequest) returns (QueryResult) {}
+}
+
+message QueryRequest {
+  enum QueryType {
+    TRANSACTION_ID = 0;
+    PAYER_ID = 1;
+  }
+  QueryType type = 1;
+  string param = 2;
+}
+
+message QueryResult {
+  repeated QueryResultItem items = 1;
+}
+
+message QueryResultItem {
+  string transactionId = 1;
+  string currencyId = 2;
+  double amount = 3;
+  string createdAt = 4;
+  string payerId = 5;
+  string recipientId = 6;
+  enum Status {
+    PENDING = 0;
+    CONFIRMED = 1;
+    ERROR = 2;
+    CANCELED = 3;
+  }
+  Status status = 7;
+  enum Type {
+    TRANSFER = 0;
+    PAY = 1;
+  }
+  Type type = 8;
+}
+
+message PaymentRequest {
+  enum Type {
+    TRANSFER = 0;
+    PAY = 1;
+  }
+  Type type = 1;
+  string payerId = 2;
+  string recipientId = 3;
+  string currencyId = 4;
+  double amount = 5;
+  string note = 6;
+}
+
+// Response message with the greetings
+message PaymentResult {
+  string transactionId = 1;
+}

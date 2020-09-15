@@ -1,16 +1,16 @@
 package io.openmarket.account.service;
+
 import com.google.common.hash.Hashing;
-import io.openmarket.account.dao.dynamodb.UserDao;
+import io.openmarket.account.dynamodb.UserDao;
 import io.openmarket.account.grpc.AccountService;
 import io.openmarket.account.model.Account;
+import lombok.extern.log4j.Log4j2;
 
 import javax.inject.Inject;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidParameterException;
 import java.util.Optional;
 import java.util.Random;
-import io.openmarket.account.grpc.AccountService.*;
-import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public final class AccountServiceHandler {
@@ -24,12 +24,13 @@ public final class AccountServiceHandler {
         this.credentialManager = cm;
     }
 
-    public LoginResult login(LoginRequest loginRequest) {
+    public AccountService.LoginResult login(AccountService.LoginRequest loginRequest) {
         if (loginRequest == null) throw new IllegalArgumentException();
 
         if (loginRequest.getUsername().isEmpty() || loginRequest.getPassword().isEmpty()) {
             log.info("Reqeuset contains invalid param");
-            return LoginResult.newBuilder().setLoginStatus(LoginResult.Status.LOGIN_FAIL_INVALID_PARAM).build();
+            return AccountService.LoginResult.newBuilder()
+                    .setLoginStatus(AccountService.LoginResult.Status.LOGIN_FAIL_INVALID_PARAM).build();
         }
         String username = loginRequest.getUsername();
         String password = loginRequest.getPassword();
@@ -38,7 +39,8 @@ public final class AccountServiceHandler {
         if (!potentialUser.isPresent()) {
             //Todo set this to a new status call user not found
             log.info("User " + username + " is not found");
-            return LoginResult.newBuilder().setLoginStatus(LoginResult.Status.LOGIN_FAIL_INCORRECT_PASSWORD_OR_USERNAME)
+            return AccountService.LoginResult.newBuilder()
+                    .setLoginStatus(AccountService.LoginResult.Status.LOGIN_FAIL_INCORRECT_PASSWORD_OR_USERNAME)
                     .build();
         }
 
@@ -49,14 +51,16 @@ public final class AccountServiceHandler {
 
         if (!passwd.equals(submittedPasswd)) {
             log.info("Login failed due to incorrect password or username");
-            return LoginResult.newBuilder().setLoginStatus(LoginResult.Status.LOGIN_FAIL_INCORRECT_PASSWORD_OR_USERNAME)
+            return AccountService.LoginResult.newBuilder()
+                    .setLoginStatus(AccountService.LoginResult.Status.LOGIN_FAIL_INCORRECT_PASSWORD_OR_USERNAME)
                     .build();
         }
 
         String token = credentialManager.generateToken(user.getUsername());
 
         log.info("User " + username + "logged in with token" + token);
-        return LoginResult.newBuilder().setUsername(user.getUsername()).setLoginStatus(LoginResult.Status.LOGIN_SUCCESS)
+        return AccountService.LoginResult.newBuilder().setUsername(user.getUsername())
+                .setLoginStatus(AccountService.LoginResult.Status.LOGIN_SUCCESS)
                 .setCred(token).build();
     }
 
@@ -98,14 +102,15 @@ public final class AccountServiceHandler {
     /******
      * Update user display name or password
      */
-    public UpdateResult updateUser(UpdateRequest request) {
+    public io.openmarket.account.grpc.AccountService.UpdateResult updateUser(io.openmarket.account.grpc.AccountService.UpdateRequest request) {
         String username = request.getUsername();
         validateParam(username);
 
         Optional<Account> potentialAccount = this.userDao.load(username);
 
         if (!potentialAccount.isPresent()) {
-            return UpdateResult.newBuilder().setUpdateStatus(UpdateResult.Status.UPDATE_FAILED_USER_NOT_FOUND)
+            return io.openmarket.account.grpc.AccountService.UpdateResult.newBuilder()
+                    .setUpdateStatus(io.openmarket.account.grpc.AccountService.UpdateResult.Status.UPDATE_FAILED_USER_NOT_FOUND)
                     .build();
         }
 
@@ -118,8 +123,8 @@ public final class AccountServiceHandler {
         }
 
         this.userDao.save(existingAccount);
-        return UpdateResult.newBuilder().setNewDisplayName(request.getNewDisplayName())
-                .setUpdateStatus(UpdateResult.Status.UPDATE_SUCCESS).build();
+        return io.openmarket.account.grpc.AccountService.UpdateResult.newBuilder().setNewDisplayName(request.getNewDisplayName())
+                .setUpdateStatus(AccountService.UpdateResult.Status.UPDATE_SUCCESS).build();
     }
 
     private void validateParam(String input) {
