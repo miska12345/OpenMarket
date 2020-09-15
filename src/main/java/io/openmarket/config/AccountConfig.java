@@ -21,7 +21,7 @@ public class AccountConfig {
     /**
      * The DDB attribute name for the unique username of Account.
      */
-    public static final String USER_DDB_ATTRIBUTE_USERNAME = "username";
+    public static final String USER_DDB_ATTRIBUTE_USERNAME = "Username";
 
     /**
      * The length constraint for username of Account.
@@ -31,27 +31,22 @@ public class AccountConfig {
     /**
      * The DDB attribute for portraitKey of Account.
      */
-    public static final String USER_DDB_ATTRIBUTE_PORTRAITKEY = "portraitKey";
+    public static final String USER_DDB_ATTRIBUTE_PORTRAITKEY = "PortraitKey";
 
     /**
      * The DDB attribute name for the hashed password of Account.
      */
-    public static final String USER_DDB_ATTRIBUTE_PASSWORDHASH = "passwordHash";
+    public static final String USER_DDB_ATTRIBUTE_PASSWORDHASH = "PasswordHash";
 
     /**
      * The DDB attribute name for the salt of Account.
      */
-    public static final String USER_DDB_ATTRIBUTE_PASSWORDSALT = "passwordSalt";
+    public static final String USER_DDB_ATTRIBUTE_PASSWORDSALT = "PasswordSalt";
 
     /**
      * The DDB attribute name for the display name of Account.
      */
-    public static final String USER_DDB_ATTRIBUTE_DISPLAYNAME = "displayName";
-
-    /**
-     * The DDB attribute name for the coins of Account.
-     */
-    public static final String USER_DDB_ATTRIBUTE_COINS       = "coins";
+    public static final String USER_DDB_ATTRIBUTE_DISPLAYNAME = "DisplayName";
 
     /**
      * The DDB attribute name for the create time of Account.

@@ -11,15 +11,12 @@ import io.openmarket.account.dao.dynamodb.UserDao;
 import io.openmarket.account.dao.dynamodb.UserDaoImpl;
 import io.openmarket.account.service.AccountServiceHandler;
 import io.openmarket.account.service.CredentialManager;
-import io.openmarket.transaction.dao.dynamodb.TransactionDaoImpl;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 
 import static io.openmarket.config.AccountConfig.*;
-import static io.openmarket.config.TransactionConfig.TRANSACTION_DDB_ATTRIBUTE_ID;
-import static io.openmarket.config.TransactionConfig.TRANSACTION_DDB_TABLE_NAME;
 
 public class AccountTestTemplateLocalDB {
     protected static AmazonDynamoDBLocal localDBClient;
