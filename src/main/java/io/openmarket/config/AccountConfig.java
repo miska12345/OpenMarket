@@ -51,16 +51,18 @@ public class AccountConfig {
     /**
      * The DDB attribute name for the create time of Account.
      */
-    public static final String USER_DDB_ATTRIBUTE_CREATEAT     = "createAt";
+    public static final String USER_DDB_ATTRIBUTE_CREATEAT     = "CreateAt";
 
     /**
      * The DDB attribute name for the last update time of Account.
      */
-    public static final String USER_DDB_ATTRIBUTE_LASTUPDATEDAT = "lastUpdatedAt";
+    public static final String USER_DDB_ATTRIBUTE_LASTUPDATEDAT = "LastUpdatedAt";
 
     /**
      * The DDB config for enabling the credential verification
      */
 
     public static final boolean TOKEN_VERIFICATION_ENABLE = false;
+
+    public static final String USER_DDB_ATTRIBUTE_TAGS = "Tags";
 }

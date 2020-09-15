@@ -5,10 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
-import org.checkerframework.checker.initialization.qual.NotOnlyInitialized;
-
-import java.util.Map;
 import java.util.Date;
+import java.util.Set;
 
 import static io.openmarket.config.AccountConfig.*;
 
@@ -47,5 +45,8 @@ public class Account {
     @DynamoDBTypeConvertedTimestamp
     @DynamoDBAttribute(attributeName = USER_DDB_ATTRIBUTE_LASTUPDATEDAT)
     private Date lastUpdatedAt;
+
+    @DynamoDBAttribute(attributeName = USER_DDB_ATTRIBUTE_TAGS)
+    private Set<String> tags;
 
 }

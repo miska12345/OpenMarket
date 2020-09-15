@@ -6,6 +6,7 @@ import io.openmarket.account.model.Account;
 
 import javax.inject.Inject;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidParameterException;
 import java.util.Optional;
 import java.util.Random;
 import io.openmarket.account.grpc.AccountService.*;
@@ -24,6 +25,8 @@ public final class AccountServiceHandler {
     }
 
     public LoginResult login(LoginRequest loginRequest) {
+        if (loginRequest == null) throw new IllegalArgumentException();
+
         if (loginRequest.getUsername().isEmpty() || loginRequest.getPassword().isEmpty()) {
             log.info("Reqeuset contains invalid param");
             return LoginResult.newBuilder().setLoginStatus(LoginResult.Status.LOGIN_FAIL_INVALID_PARAM).build();
@@ -58,7 +61,7 @@ public final class AccountServiceHandler {
     }
 
     public AccountService.RegistrationResult register(AccountService.RegistrationRequest request) {
-        if (request == null) throw new NullPointerException();
+        if (request == null) throw new IllegalArgumentException();
 
         if (request.getPassword().isEmpty() || request.getDisplayName().isEmpty()
             ||request.getUsername().isEmpty()){
@@ -92,6 +95,38 @@ public final class AccountServiceHandler {
                .build();
     }
 
+    /******
+     * Update user display name or password
+     */
+    public UpdateResult updateUser(UpdateRequest request) {
+        String username = request.getUsername();
+        validateParam(username);
+
+        Optional<Account> potentialAccount = this.userDao.load(username);
+
+        if (!potentialAccount.isPresent()) {
+            return UpdateResult.newBuilder().setUpdateStatus(UpdateResult.Status.UPDATE_FAILED_USER_NOT_FOUND)
+                    .build();
+        }
+
+        Account existingAccount = potentialAccount.get();
+
+        if (!request.getNewDisplayName().isEmpty()) existingAccount.setDisplayName(request.getNewDisplayName());
+        if (!request.getNewPassword().isEmpty()) {
+            String salt = existingAccount.getPasswordSalt();
+            existingAccount.setPasswordHash(hash(request.getNewPassword(), salt));
+        }
+
+        this.userDao.save(existingAccount);
+        return UpdateResult.newBuilder().setNewDisplayName(request.getNewDisplayName())
+                .setUpdateStatus(UpdateResult.Status.UPDATE_SUCCESS).build();
+    }
+
+    private void validateParam(String input) {
+        if (input.isEmpty() || input == null)
+            throw new InvalidParameterException("Request parameter(s) is empty or null");
+
+    }
 
 
     /****************************
