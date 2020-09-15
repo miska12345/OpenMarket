@@ -26,6 +26,8 @@ repositories {
         name "DynamoDB Local Release Repository - US West (Oregon) Region"
         url "https://s3-us-west-2.amazonaws.com/dynamodb-local/release"
     }
+
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -35,8 +37,8 @@ dependencies {
     testCompileOnly 'org.projectlombok:lombok:1.18.12'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.12'
 
-    compile 'com.google.dagger:dagger:2.4'
-    annotationProcessor "com.google.dagger:dagger-compiler:2.4"
+    compile 'com.google.dagger:dagger:2.29'
+    annotationProcessor "com.google.dagger:dagger-compiler:2.29"
 
     compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.13.3'
     compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.13.3'
@@ -53,6 +55,8 @@ dependencies {
 
     compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.13.3'
     compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.13.3'
+
+    implementation 'com.github.miska12345:OpenMarket-Dao:master-SNAPSHOT'
 
     implementation platform('com.amazonaws:aws-java-sdk-bom:1.11.859')
     implementation 'com.amazonaws:aws-java-sdk-s3'

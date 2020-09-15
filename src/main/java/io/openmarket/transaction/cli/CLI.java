@@ -14,8 +14,21 @@ public class CLI {
     private static TransactionServiceHandler handler;
     public static void main(String[] args) {
         initialize();
-        //handleQuery();
-        handleTransaction();
+        handleInput();
+    }
+
+    private static void handleInput() {
+        do {
+            System.out.println("Enter ops [query id, query payer, transaction]:");
+            String ops = scanner.nextLine();
+            if (ops.equals("query payer")) {
+                handleQuery();
+            } else if (ops.equals("query id")) {
+                handleQuery2();
+            } else if (ops.equals("transaction")) {
+                handleTransaction();
+            }
+        } while (true);
     }
 
     private static void initialize() {
@@ -33,14 +46,26 @@ public class CLI {
         System.out.println(result.getItemsList());
     }
 
+    private static void handleQuery2() {
+        System.out.println("Enter transaction id:");
+        TransactionProto.QueryRequest request = TransactionProto.QueryRequest.newBuilder()
+                .setType(TransactionProto.QueryRequest.QueryType.TRANSACTION_ID)
+                .setParam(scanner.nextLine()).build();
+        TransactionProto.QueryResult result = handler.handleQuery(request);
+        System.out.println(result.getItemsList());
+    }
+
     private static void handleTransaction() {
+        System.out.println("Enter payerId");
+        String payer = scanner.nextLine();
         TransactionProto.PaymentRequest payment = TransactionProto.PaymentRequest.newBuilder()
                 .setCurrencyId("123")
                 .setAmount(3.21)
-                .setPayerId("123")
+                .setPayerId(payer)
                 .setRecipientId("321")
                 .setType(TransactionProto.PaymentRequest.Type.TRANSFER)
                 .build();
-        handler.handlePayment(payment);
+        String id = handler.handlePayment(payment).getTransactionId();
+        System.out.println(String.format("TransactionID: %s", id));
     }
 }

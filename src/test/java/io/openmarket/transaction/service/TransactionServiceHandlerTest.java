@@ -2,6 +2,7 @@ package io.openmarket.transaction.service;
 
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import io.openmarket.transaction.dao.dynamodb.TransactionDao;
+import io.openmarket.transaction.dao.sqs.SQSTransactionTaskPublisher;
 import io.openmarket.transaction.grpc.TransactionProto;
 import io.openmarket.transaction.model.Transaction;
 import io.openmarket.transaction.model.TransactionErrorType;
@@ -15,7 +16,13 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.stubbing.Answer;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static io.openmarket.config.TransactionConfig.TRANSACTION_INITIAL_ERROR_TYPE;
@@ -26,18 +33,21 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 public class TransactionServiceHandlerTest {
+    private static final String QUEUE_URL = "queue_url";
     private static final String CURRENCY_ID = "100";
     private static final String PAYER_ID = "001";
     private static final String RECIPIENT_ID = "002";
     private static final String NOTE = "Hello";
 
     private TransactionDao transactionDao;
+    private SQSTransactionTaskPublisher sqsPublisher;
     private TransactionServiceHandler handler;
 
     @BeforeEach
     public void setup() {
         this.transactionDao = mock(TransactionDao.class);
-        this.handler = new TransactionServiceHandler(transactionDao);
+        this.sqsPublisher = mock(SQSTransactionTaskPublisher.class);
+        this.handler = new TransactionServiceHandler(transactionDao, sqsPublisher, QUEUE_URL);
     }
 
     @Test
@@ -106,7 +116,7 @@ public class TransactionServiceHandlerTest {
     }
 
     @Test
-    public void check_Transfer_DB_Entry() {
+    public void check_Payment_DB_Entry_And_SQS_Msg() {
         TransactionProto.PaymentRequest request = TransactionProto.PaymentRequest.newBuilder()
                 .setPayerId(PAYER_ID)
                 .setRecipientId(RECIPIENT_ID)
@@ -128,6 +138,15 @@ public class TransactionServiceHandlerTest {
                         && a.getNote().equals(request.getNote())
                 )
         );
+
+        verify(sqsPublisher, times(1)).publish(eq(QUEUE_URL),
+                argThat(a -> a.getTransactionId().equals(result.getTransactionId())));
+    }
+
+    @ParameterizedTest
+    @MethodSource("getInvalidPaymentRequests")
+    public void check_Invalid_Payment_Request(TransactionProto.PaymentRequest request) {
+        assertThrows(IllegalArgumentException.class, () -> handler.handlePayment(request));
     }
 
     @ParameterizedTest
@@ -158,14 +177,21 @@ public class TransactionServiceHandlerTest {
         verify(transactionDao, times(0)).save(any());
     }
 
-    @Test
-    public void test_isTransferRequestValid() {
-        assertFalse(handler.isTransferRequestValid(TransactionProto.PaymentRequest.newBuilder().setPayerId("").build()));
-        assertFalse(handler.isTransferRequestValid(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId("").build()));
-        assertFalse(handler.isTransferRequestValid(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(RECIPIENT_ID).setCurrencyId("").build()));
-        assertFalse(handler.isTransferRequestValid(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(RECIPIENT_ID).setCurrencyId(CURRENCY_ID).setAmount(0).build()));
-        assertFalse(handler.isTransferRequestValid(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(RECIPIENT_ID).setCurrencyId(CURRENCY_ID).setAmount(-1).build()));
-        assertFalse(handler.isTransferRequestValid(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(PAYER_ID).setCurrencyId(CURRENCY_ID).setAmount(1.3).build()));
+    @ParameterizedTest
+    @MethodSource("getInvalidPaymentRequests")
+    public void test_isTransferRequestValid(TransactionProto.PaymentRequest request) {
+        assertFalse(handler.isPaymentRequestValid(request));
+    }
+
+    private static Stream<Arguments> getInvalidPaymentRequests() {
+        return Stream.of(
+                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId("").build()),
+                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId("").build()),
+                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(RECIPIENT_ID).setCurrencyId("").build()),
+                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(RECIPIENT_ID).setCurrencyId(CURRENCY_ID).setAmount(0).build()),
+                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(RECIPIENT_ID).setCurrencyId(CURRENCY_ID).setAmount(-1).build()),
+                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(PAYER_ID).setCurrencyId(CURRENCY_ID).setAmount(1.3).build())
+        );
     }
 
     private Transaction generateTransaction(String id) {
