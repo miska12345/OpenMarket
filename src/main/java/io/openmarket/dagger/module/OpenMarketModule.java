@@ -2,6 +2,9 @@ package io.openmarket.dagger.module;
 
 import dagger.Module;
 import dagger.Provides;
+import io.openmarket.account.dynamodb.UserDao;
+import io.openmarket.account.service.AccountServiceHandler;
+import io.openmarket.account.service.CredentialManager;
 import io.openmarket.transaction.dao.dynamodb.TransactionDao;
 import io.openmarket.transaction.dao.sqs.SQSTransactionTaskPublisher;
 import io.openmarket.transaction.service.TransactionServiceHandler;
@@ -21,11 +24,11 @@ public class OpenMarketModule {
         return new TransactionServiceHandler(transacDao, sqsPublisher, queueURL);
     }
 
-//    @Provides
-//    @Singleton
-//    AccountServiceHandler provideAccountHandler(final UserDao userDao, final CredentialManager credManager) {
-//        return new AccountServiceHandler(userDao, credManager);
-//    }
+    @Provides
+    @Singleton
+    AccountServiceHandler provideAccountHandler(final UserDao userDao, final CredentialManager credManager) {
+        return new AccountServiceHandler(userDao, credManager);
+    }
 
     @Provides
     @Named(ENV_VAR_TRANSAC_QUEUE_URL)
