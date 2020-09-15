@@ -3,7 +3,9 @@ package io.openmarket.transaction.cli;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
+import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import io.openmarket.transaction.dao.dynamodb.TransactionDaoImpl;
+import io.openmarket.transaction.dao.sqs.SQSTransactionTaskPublisher;
 import io.openmarket.transaction.grpc.TransactionProto;
 import io.openmarket.transaction.service.TransactionServiceHandler;
 
@@ -34,7 +36,9 @@ public class CLI {
     private static void initialize() {
         scanner = new Scanner(System.in);
         AmazonDynamoDB dbClient = AmazonDynamoDBClientBuilder.standard().build();
-        handler = new TransactionServiceHandler(new TransactionDaoImpl(dbClient, new DynamoDBMapper(dbClient)));
+        SQSTransactionTaskPublisher sqsPublisher = new SQSTransactionTaskPublisher(AmazonSQSClientBuilder.standard().build());
+        handler = new TransactionServiceHandler(new TransactionDaoImpl(dbClient, new DynamoDBMapper(dbClient)),
+                sqsPublisher, "https://sqs.us-west-2.amazonaws.com/185046651126/TransactionTaskQueue");
     }
 
     private static void handleQuery() {
