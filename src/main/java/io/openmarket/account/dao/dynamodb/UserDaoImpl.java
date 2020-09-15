@@ -7,6 +7,7 @@ import io.openmarket.account.model.Account;
 import io.openmarket.dao.dynamodb.AbstractDynamoDBDao;
 
 import javax.inject.Inject;
+import java.security.InvalidParameterException;
 import java.util.*;
 
 import static io.openmarket.config.AccountConfig.*;
@@ -19,6 +20,7 @@ public class UserDaoImpl extends AbstractDynamoDBDao<Account> implements UserDao
 
     @Override
     protected boolean validate(Account obj) {
+        //Todo add constraint to username such as no inappropriate name
        if (obj.getUsername().length() > ACCOUNT_USERNAME_LENGTH_LIMIT
        ||obj.getUsername().isEmpty()) {
            return false;
@@ -28,6 +30,15 @@ public class UserDaoImpl extends AbstractDynamoDBDao<Account> implements UserDao
            return false;
        }
        return true;
+    }
+
+    public List<String> getUserTags(String username) {
+        Optional<Account> potentialAccount = this.load(username);
+        if (!potentialAccount.isPresent()) {
+            throw new InvalidParameterException("User does not exist");
+        }
+
+        return potentialAccount.get().getTags();
     }
 
     @Override
