@@ -4,6 +4,7 @@ import com.auth0.jwt.JWT;
 import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
+import com.auth0.jwt.interfaces.Claim;
 import io.openmarket.utils.TimeUtils;
 import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
@@ -12,9 +13,10 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Collections;
 import java.util.Date;
+import java.util.Map;
 
-import static io.openmarket.config.EnvironmentConfig.ENV_VAR_RPC_USE_VALIDATION;
 import static io.openmarket.config.EnvironmentConfig.ENV_VAR_TOKEN_DURATION;
 
 @Log4j2
@@ -22,41 +24,45 @@ public final class CredentialManager {
     private static final int KEY_LENGTH = 256;
     private static final Algorithm serverKey = Algorithm.HMAC256(getSecureServerKey());
     private static final String ISSUER = "OpenMarket";
-    private static final String CLAIM_USERNAME = "Username";
 
-    private final boolean isEnabled;
+    /**
+     * The name for username claimable attribute.
+     */
+    public static final String CLAIM_USERNAME = "Username";
+
+    /**
+     * The name for userId claimable attribute.
+     */
+    public static final String CLAIM_USER_ID = "UserId";
+
     private final int tokenDuration;
 
     @Inject
-    public CredentialManager(@Named(ENV_VAR_RPC_USE_VALIDATION) final boolean enableValidation,
-                             @Named(ENV_VAR_TOKEN_DURATION) final int tokenDuration) {
-        this.isEnabled = enableValidation;
+    public CredentialManager(@Named(ENV_VAR_TOKEN_DURATION) final int tokenDuration) {
         this.tokenDuration = tokenDuration;
         log.info("CredentialManager started");
     }
 
-    public boolean verifyToken(@NonNull final String token, @NonNull final String username) {
-        if (!isEnabled)
-            return true;
-
+    public Map<String, Claim> getClaims(@NonNull final String token) {
         try {
             final JWTVerifier verifier = JWT.require(serverKey)
                     .withIssuer(ISSUER)
-                    .withClaim(CLAIM_USERNAME, username)
                     .build();
             //if the jwt is not valid, a verification exception would be thrown
-            verifier.verify(token);
+            return verifier.verify(token).getClaims();
         }catch (JWTVerificationException e) {
-            log.error("Token '{}' failed to validate with username '{}': {}", token, username, e.getMessage());
-            return false;
+            log.error("Token '{}' failed to validate: {}", token, e.getMessage());
         }
-        return true;
+        return Collections.emptyMap();
     }
 
-    public String generateToken(@NonNull final String username, @NonNull final Date today) {
+    public String generateToken(@NonNull final String username,
+                                @NonNull final String userId,
+                                @NonNull final Date today) {
         return JWT.create()
                 .withIssuer(ISSUER)
                 .withClaim(CLAIM_USERNAME, username)
+                .withClaim(CLAIM_USER_ID, userId)
                 .withIssuedAt(today)
                 .withExpiresAt(TimeUtils.getDateAfter(today, tokenDuration))
                 .sign(serverKey);
