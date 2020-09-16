@@ -26,15 +26,17 @@ hs_err_pid*
 src/generated/
 
 # IntelliJ
-.DS_Store
-.iml
-.idea
+*.DS_Store
+*.iml
+*.idea
 
 # Gradle
 .gradle
 **/build/
 # Ignore Gradle GUI config
 gradle-app.setting
+
+*.properties
 
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar

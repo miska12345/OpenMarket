@@ -26,6 +26,8 @@ repositories {
         name "DynamoDB Local Release Repository - US West (Oregon) Region"
         url "https://s3-us-west-2.amazonaws.com/dynamodb-local/release"
     }
+
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -35,8 +37,8 @@ dependencies {
     testCompileOnly 'org.projectlombok:lombok:1.18.12'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.12'
 
-    compile 'com.google.dagger:dagger:2.4'
-    annotationProcessor "com.google.dagger:dagger-compiler:2.4"
+    compile 'com.google.dagger:dagger:2.29'
+    annotationProcessor "com.google.dagger:dagger-compiler:2.29"
 
     compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.13.3'
     compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.13.3'
@@ -49,8 +51,12 @@ dependencies {
     compile 'com.google.dagger:dagger:2.4'
     annotationProcessor "com.google.dagger:dagger-compiler:2.4"
 
+    implementation("com.google.guava:guava:29.0-jre")
+
     compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.13.3'
     compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.13.3'
+
+    implementation 'com.github.miska12345:OpenMarket-Dao:master-SNAPSHOT'
 
     implementation platform('com.amazonaws:aws-java-sdk-bom:1.11.859')
     implementation 'com.amazonaws:aws-java-sdk-s3'
@@ -60,13 +66,26 @@ dependencies {
 
     implementation("com.google.guava:guava:29.0-jre")
 
+    implementation 'com.auth0:java-jwt:3.10.3'
+
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.3.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.3.1'
+    testCompile "org.mockito:mockito-core:2.+"
+
+
+    compile 'io.jsonwebtoken:jjwt-api:0.11.2'
+    runtime 'io.jsonwebtoken:jjwt-impl:0.11.2',
+            // Uncomment the next line if you want to use RSASSA-PSS (PS256, PS384, PS512) algorithms:
+            //'org.bouncycastle:bcprov-jdk15on:1.60',
+            'io.jsonwebtoken:jjwt-jackson:0.11.2' // or 'io.jsonwebtoken:jjwt-gson:0.11.2' for gson
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.4.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
+    testCompile group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.7.0-RC1'
     testCompile "org.mockito:mockito-core:2.+"
     // https://mvnrepository.com/artifact/com.amazonaws/DynamoDBLocal
     testCompile group: 'com.amazonaws', name: 'DynamoDBLocal', version: '1.13.3'
     testCompile group: 'com.almworks.sqlite4java', name: 'sqlite4java', version: '0.282'
-
 }
 
 protobuf {
@@ -98,7 +117,8 @@ idea {
 
 // Define the packages that should be excluded from JaCoCo.
 // For example, to exclude a package called 'a', add '**/a/**'.
-def excludeFromCoverage = ['**/model/*', '**/dao/*']
+def excludeFromCoverage = ['**/model/*', '**/dao/*', '**/grpc/*', '**/config/*', '**/exception/*', '**/utils/**',
+                           '**/cli/**']
 
 jacocoTestReport {
     reports {
@@ -143,6 +163,7 @@ test {
         excludes = excludeFromCoverage
     }
     systemProperty("sqlite4java.library.path", "lib")
+    systemProperty("log4j.configurationFile", "log4j.xml")
 }
 
 test.finalizedBy jacocoTestReport
