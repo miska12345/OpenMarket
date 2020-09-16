@@ -9,6 +9,7 @@ import lombok.extern.log4j.Log4j2;
 import javax.inject.Inject;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidParameterException;
+import java.util.Date;
 import java.util.Optional;
 import java.util.Random;
 
@@ -57,7 +58,7 @@ public final class AccountServiceHandler {
                     .build();
         }
 
-        String token = credentialManager.generateToken(user.getUsername());
+        String token = credentialManager.generateToken(user.getUsername(), new Date());
 
         log.info("User " + username + "logged in with token" + token);
         return LoginResult.newBuilder().setUsername(user.getUsername())
@@ -129,7 +130,7 @@ public final class AccountServiceHandler {
     }
 
     private void validateParam(String input) {
-        if (input.isEmpty() || input == null)
+        if (input == null || input.isEmpty())
             throw new InvalidParameterException("Request parameter(s) is empty or null");
 
     }

@@ -23,4 +23,9 @@ public class EnvironmentConfig {
      * The environment variable name for whether to use validation or not.
      */
     public static final String ENV_VAR_RPC_USE_VALIDATION = "UseValidation";
+
+    /**
+     * The environment variable name for how long a token is valid for (in hours).
+     */
+    public static final String ENV_VAR_TOKEN_DURATION = "TokenDuration";
 }
