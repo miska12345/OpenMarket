@@ -33,8 +33,7 @@ public class OrgDaoImpl extends AbstractDynamoDBDao<Organization> implements Org
 
     @Override
     protected boolean validate(Organization obj) {
-        if (obj.getOrgName() == null
-        ) return false;
+        if (obj.getOrgName() == null) return false;
 
         return true;
     }

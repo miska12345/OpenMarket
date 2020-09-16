@@ -5,6 +5,7 @@ import io.openmarket.organization.model.Organization;
 import lombok.extern.log4j.Log4j2;
 import organization.OrganizationOuterClass;
 
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
@@ -15,6 +16,11 @@ public class OrgServiceHandler {
 
     public OrgServiceHandler (OrgDaoImpl orgDao) {
         this.orgDao = orgDao;
+    }
+
+    public void addOrgRquest(OrganizationOuterClass.orgMetadata params) {
+        Organization org = this.orgMetadata2Org(params);
+        this.addOrg(org);
     }
 
     public void addOrg(Organization org) {
@@ -41,12 +47,17 @@ public class OrgServiceHandler {
         return orgDao.load(name);
     }
 
-    public void update(String name, Organization org) {
-        if (!orgDao.load(name).isPresent()) {
-            log.error("Organization name has been occupied!");
-            throw new IllegalArgumentException("Organization name has been occupied!");
+    public OrganizationOuterClass.orgMetadata getOrgRequest(OrganizationOuterClass.orgMetadataRequest params) {
+        if (params.getOrgName().isEmpty()) {
+            log.error("Missing organization name!");
+            throw new IllegalArgumentException("Missing organization name!");
         }
-        orgDao.save(org);
+        Organization org = this.getOrg(params.getOrgName()).get();
+        if (org == null) {
+            log.error("Organization is missing!");
+            throw new IllegalArgumentException("Organization is missing!");
+        }
+        return this.org2OrgMetadata(org);
     }
 
     public void addCurrency(String name, String currency) {
@@ -61,12 +72,8 @@ public class OrgServiceHandler {
         orgDao.save(org);
     }
 
-    public void partial_update(OrganizationOuterClass.orgMetadata params) {
-        if (params == null) {
-            log.error("Invalid request!");
-            throw new IllegalArgumentException("Invalid request!");
-        }
-        if (params.getOrgName() == null) {
+    public void partialUpdateRequest(OrganizationOuterClass.orgMetadata params) {
+        if (params.getOrgName().isEmpty()) {
             log.error("Missing organization name!");
             throw new IllegalArgumentException("Missing organization name!");
         }
@@ -74,12 +81,64 @@ public class OrgServiceHandler {
             log.error("Non-existing organization name.");
             throw new IllegalArgumentException("Non-existing organization name.");
         }
-        Organization updated_org = new Organization();
-        if (params.getOrgDescription() != null) updated_org.setOrgDescription(params.getOrgDescription());
-        if (params.getOrgSlogan() != null) updated_org.setOrgSlogan(params.getOrgSlogan());
-        if (params.getOrgOwnerId() != null) updated_org.setOrgOwnerId(params.getOrgOwnerId());
-        if (params.getOrgPortraitS3Key() != null) updated_org.setOrgPortraitS3Key(params.getOrgPortraitS3Key());
-        this.update(params.getOrgName(), updated_org);
+        Organization updated_org = (Organization) orgDao.load(params.getOrgName()).get();
+        if (!params.getOrgDescription().isEmpty()) updated_org.setOrgDescription(params.getOrgDescription());
+        if (!params.getOrgSlogan().isEmpty()) updated_org.setOrgSlogan(params.getOrgSlogan());
+        if (!params.getOrgOwnerId().isEmpty()) updated_org.setOrgOwnerId(params.getOrgOwnerId());
+        if (!params.getOrgPortraitS3Key().isEmpty()) updated_org.setOrgPortraitS3Key(params.getOrgPortraitS3Key());
+
+        orgDao.save(updated_org);
     }
+
+    private Organization orgMetadata2Org (OrganizationOuterClass.orgMetadata params) {
+        if (!params.getOrgName().isEmpty());
+        else {
+            log.error("Organization name is missing!");
+            throw new IllegalArgumentException("Organization name is missing!");
+        };
+
+        Organization org = Organization.builder().orgName(params.getOrgName()).build();
+        if (!params.getOrgCurrenciesList().isEmpty()) org.setOrgCurrencies(new HashSet<>(params.getOrgCurrenciesList()));
+        else org.setOrgCurrencies(ImmutableSet.of());
+
+        if (!params.getOrgDescription().isEmpty()) org.setOrgDescription(params.getOrgDescription());
+        else org.setOrgDescription("");
+
+        if (!params.getOrgSlogan().isEmpty()) org.setOrgSlogan(params.getOrgSlogan());
+        else org.setOrgSlogan("");
+
+        if (!params.getOrgOwnerId().isEmpty()) org.setOrgOwnerId(params.getOrgOwnerId());
+        else {
+            log.error("Organization owner name is missing!");
+            throw new IllegalArgumentException("Organization owner name is missing!");
+        };
+
+        if (!params.getOrgPortraitS3Key().isEmpty()) org.setOrgPortraitS3Key(params.getOrgPortraitS3Key());
+        else org.setOrgPortraitS3Key("");
+
+        return org;
+    }
+
+
+    private OrganizationOuterClass.orgMetadata org2OrgMetadata (Organization org) {
+        if (org.getOrgName() == null || org.getOrgName().isEmpty()) {
+            log.error("Organization name is missing!");
+            throw new IllegalArgumentException("Organization name is missing!");
+        }
+
+        if (org.getOrgOwnerId() == null || org.getOrgOwnerId().isEmpty()) {
+            log.error("Organization owner name is missing!");
+            throw new IllegalArgumentException("Organization owner name is missing!");
+        }
+        return OrganizationOuterClass.orgMetadata.newBuilder()
+                .addAllOrgCurrencies(org.getOrgCurrencies())
+                .setOrgOwnerId(org.getOrgOwnerId())
+                .setOrgSlogan(org.getOrgSlogan())
+                .setOrgDescription(org.getOrgDescription())
+                .setOrgPortraitS3Key(org.getOrgPortraitS3Key())
+                .setOrgName(org.getOrgName())
+                .build();
+    }
+
 
 }

@@ -10,7 +10,7 @@ service Organization {
 
 
 
-message orgMetadataResult {
+message orgMetadataRequest {
   string orgName = 1;
 }
 
