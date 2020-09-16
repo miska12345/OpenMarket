@@ -12,7 +12,7 @@ import io.openmarket.transaction.service.TransactionServiceHandler;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-import static io.openmarket.config.EnvironmentConfig.ENV_VAR_TRANSAC_QUEUE_URL;
+import static io.openmarket.config.EnvironmentConfig.*;
 
 @Module(includes = {AWSModule.class, DaoModule.class})
 public class OpenMarketModule {
@@ -33,7 +33,19 @@ public class OpenMarketModule {
     @Provides
     @Named(ENV_VAR_TRANSAC_QUEUE_URL)
     @Singleton
-    public String provideTransacQueueURL() {
-        return "https://sqs.us-west-2.amazonaws.com/185046651126/TransactionTaskQueue";
+    String provideTransacQueueURL(final EnvMap map) {
+        return map.get(ENV_VAR_TRANSAC_QUEUE_URL);
+    }
+
+    @Provides
+    @Named(ENV_VAR_SERVER_PORT)
+    int providePort(final EnvMap env) {
+        return Integer.parseInt(env.get(ENV_VAR_SERVER_PORT));
+    }
+
+    @Provides
+    @Named(ENV_VAR_RPC_USE_VALIDATION)
+    boolean provideEnableValidation(final EnvMap env) {
+        return Boolean.parseBoolean(env.get(ENV_VAR_RPC_USE_VALIDATION));
     }
 }

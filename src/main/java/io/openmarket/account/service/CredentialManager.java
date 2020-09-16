@@ -5,21 +5,27 @@ import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import io.openmarket.config.AccountConfig;
 import lombok.AccessLevel;
 import lombok.Getter;
 import javax.inject.Inject;
+import javax.inject.Named;
 import java.util.Date;
+
+import static io.openmarket.config.EnvironmentConfig.ENV_VAR_RPC_USE_VALIDATION;
 
 public final class CredentialManager {
     @Getter(AccessLevel.PROTECTED)
     private static final Algorithm serverKey = Algorithm.HMAC256(String.valueOf(System.currentTimeMillis()));
 
+    private final boolean isEnabled;
+
     @Inject
-    public CredentialManager() {}
+    public CredentialManager(@Named(ENV_VAR_RPC_USE_VALIDATION) boolean enableValidation) {
+        this.isEnabled = enableValidation;
+    }
 
     public boolean verifyToken(String token, String username) {
-        if (!AccountConfig.TOKEN_VERIFICATION_ENABLE)
+        if (!isEnabled)
             return true;
 
         try {

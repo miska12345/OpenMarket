@@ -2,10 +2,8 @@ package io.openmarket.account.service;
 
 import com.google.common.hash.Hashing;
 import io.openmarket.account.dynamodb.UserDao;
+import io.openmarket.account.grpc.AccountService.*;
 import io.openmarket.account.model.Account;
-import io.openmarket.accountx.grpc.AccountService;
-import io.openmarket.accountx.grpc.AccountService.LoginRequest;
-import io.openmarket.accountx.grpc.AccountService.LoginResult;
 import lombok.extern.log4j.Log4j2;
 
 import javax.inject.Inject;
@@ -23,6 +21,7 @@ public final class AccountServiceHandler {
     public AccountServiceHandler(UserDao userDao, CredentialManager cm) {
         this.userDao = userDao;
         this.credentialManager = cm;
+        log.info("AccountServiceHandler started");
     }
 
     public LoginResult login(LoginRequest loginRequest) {
@@ -59,14 +58,14 @@ public final class AccountServiceHandler {
                 .setCred(token).build();
     }
 
-    public AccountService.RegistrationResult register(AccountService.RegistrationRequest request) {
+    public RegistrationResult register(RegistrationRequest request) {
         if (request == null) throw new NullPointerException();
 
         if (request.getPassword().isEmpty() || request.getDisplayName().isEmpty()
             ||request.getUsername().isEmpty()){
             log.info("Registration failed due to invalid parameter");
-            return AccountService.RegistrationResult.newBuilder()
-                    .setRegisterStatus(AccountService.RegistrationResult.Status.INVALID_PARAM).build();
+            return RegistrationResult.newBuilder()
+                    .setRegisterStatus(RegistrationResult.Status.INVALID_PARAM).build();
         }
 
         Optional<Account> chekcDuplicate = userDao.load(request.getUsername());
@@ -74,8 +73,8 @@ public final class AccountServiceHandler {
         //user name already taken
         if (chekcDuplicate.isPresent()) {
             log.info("Registration failed because username " + request.getUsername() + "is taken");
-            return AccountService.RegistrationResult.newBuilder()
-                    .setRegisterStatus(AccountService.RegistrationResult.Status.USERNAME_ALREADY_EXIST).build();
+            return RegistrationResult.newBuilder()
+                    .setRegisterStatus(RegistrationResult.Status.USERNAME_ALREADY_EXIST).build();
         }
 
         String username = request.getUsername();
@@ -89,8 +88,8 @@ public final class AccountServiceHandler {
         this.userDao.save(newUser);
 
         log.info("Registration completed, welcome " + username);
-        return AccountService.RegistrationResult.newBuilder()
-               .setRegisterStatus(AccountService.RegistrationResult.Status.REGISTER_SUCCESS)
+        return RegistrationResult.newBuilder()
+               .setRegisterStatus(RegistrationResult.Status.REGISTER_SUCCESS)
                .build();
     }
 

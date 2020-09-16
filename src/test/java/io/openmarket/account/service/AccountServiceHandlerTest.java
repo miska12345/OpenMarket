@@ -1,8 +1,8 @@
 package io.openmarket.account.service;
 
-import io.openmarket.account.model.Account;
 import io.openmarket.account.AccountTestTemplateLocalDB;
-import io.openmarket.accountx.grpc.AccountService;
+import io.openmarket.account.grpc.AccountService;
+import io.openmarket.account.model.Account;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -26,14 +26,16 @@ public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
     public void cannot_Register_when_user_exists() {
         ash.register(AccountService.RegistrationRequest.newBuilder().setUsername("weifeng1")
                 .setPassword("123").setDisplayName("didntpay").build());
-        AccountService.RegistrationResult result = this.ash.register(AccountService.RegistrationRequest.newBuilder().setUsername("weifeng1")
+        AccountService.RegistrationResult result = this.ash
+                .register(AccountService.RegistrationRequest.newBuilder().setUsername("weifeng1")
                 .setPassword("123").setDisplayName("didntpay").build());
         assertEquals(AccountService.RegistrationResult.Status.USERNAME_ALREADY_EXIST, result.getRegisterStatus());
     }
 
     @Test
     public void cannot_Register_when_displayName_empty() {
-        AccountService.RegistrationResult result = ash.register(AccountService.RegistrationRequest.newBuilder().setUsername("weifeng1")
+        AccountService.RegistrationResult result = ash
+                .register(AccountService.RegistrationRequest.newBuilder().setUsername("weifeng1")
                 .setPassword("123").build());
 
         assertEquals(AccountService.RegistrationResult.Status.INVALID_PARAM, result.getRegisterStatus());
@@ -42,7 +44,8 @@ public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
     @Test
     public void cannot_Register_when_username_empty_or_null() {
         //null username cannot be created with builder
-        AccountService.RegistrationRequest emptyUser = AccountService.RegistrationRequest.newBuilder().setUsername("").setPassword("123")
+        AccountService.RegistrationRequest emptyUser = AccountService.RegistrationRequest.newBuilder()
+                .setUsername("").setPassword("123")
                 .setDisplayName("didntpay").build();
 
 
@@ -54,7 +57,8 @@ public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
 
     @Test
     public void cannot_Register_when_password_empty_or_null() {
-        AccountService.RegistrationRequest emptyUser = AccountService.RegistrationRequest.newBuilder().setUsername("wefieng1").setPassword("")
+        AccountService.RegistrationRequest emptyUser;
+        emptyUser = AccountService.RegistrationRequest.newBuilder().setUsername("wefieng1").setPassword("")
                 .setDisplayName("didntpay").build();
 
 
