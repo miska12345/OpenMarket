@@ -122,7 +122,7 @@ public class OrgServiceHandlerTest {
                 .build();
         serviceHandler.addOrg(org);
         System.out.println(org);
-        OrganizationOuterClass.orgMetadataRequest req = OrganizationOuterClass.orgMetadataRequest.newBuilder()
+        OrganizationOuterClass.orgName req = OrganizationOuterClass.orgName.newBuilder()
                 .setOrgName(org.getOrgName())
                 .build();
         OrganizationOuterClass.orgMetadata ret = serviceHandler.getOrgRequest(req);

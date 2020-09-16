@@ -47,7 +47,7 @@ public class OrgServiceHandler {
         return orgDao.load(name);
     }
 
-    public OrganizationOuterClass.orgMetadata getOrgRequest(OrganizationOuterClass.orgMetadataRequest params) {
+    public OrganizationOuterClass.orgMetadata getOrgRequest(OrganizationOuterClass.orgName params) {
         if (params.getOrgName().isEmpty()) {
             log.error("Missing organization name!");
             throw new IllegalArgumentException("Missing organization name!");

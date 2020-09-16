@@ -3,14 +3,15 @@ syntax = "proto3";
 package organization;
 
 service Organization {
-//  rpc addOrganization (orgMetadata) return (){}
-//  rpc getOrganization (name){}
+  rpc addOrganization (orgMetadata) returns (orgName) {}
+  rpc getOrganization (orgName) returns (orgMetadata){}
+  rpc updateOrganization(orgMetadata) returns (orgName) {}
 }
 
 
 
 
-message orgMetadataRequest {
+message orgName {
   string orgName = 1;
 }
 
