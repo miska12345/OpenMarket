@@ -48,4 +48,10 @@ public class OpenMarketModule {
     boolean provideEnableValidation(final EnvMap env) {
         return Boolean.parseBoolean(env.get(ENV_VAR_RPC_USE_VALIDATION));
     }
+
+    @Provides
+    @Named(ENV_VAR_TOKEN_DURATION)
+    int provideTokenDuration(final EnvMap env) {
+        return Integer.parseInt(env.get(ENV_VAR_TOKEN_DURATION));
+    }
 }
