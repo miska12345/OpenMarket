@@ -2,6 +2,9 @@ package io.openmarket.dagger.module;
 
 import dagger.Module;
 import dagger.Provides;
+import io.openmarket.account.dynamodb.UserDao;
+import io.openmarket.account.service.AccountServiceHandler;
+import io.openmarket.account.service.CredentialManager;
 import io.openmarket.transaction.dao.dynamodb.TransactionDao;
 import io.openmarket.transaction.dao.sqs.SQSTransactionTaskPublisher;
 import io.openmarket.transaction.service.TransactionServiceHandler;
@@ -9,7 +12,7 @@ import io.openmarket.transaction.service.TransactionServiceHandler;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-import static io.openmarket.config.EnvironmentConfig.ENV_VAR_TRANSAC_QUEUE_URL;
+import static io.openmarket.config.EnvironmentConfig.*;
 
 @Module(includes = {AWSModule.class, DaoModule.class})
 public class OpenMarketModule {
@@ -21,16 +24,28 @@ public class OpenMarketModule {
         return new TransactionServiceHandler(transacDao, sqsPublisher, queueURL);
     }
 
-//    @Provides
-//    @Singleton
-//    AccountServiceHandler provideAccountHandler(final UserDao userDao, final CredentialManager credManager) {
-//        return new AccountServiceHandler(userDao, credManager);
-//    }
+    @Provides
+    @Singleton
+    AccountServiceHandler provideAccountHandler(final UserDao userDao, final CredentialManager credManager) {
+        return new AccountServiceHandler(userDao, credManager);
+    }
 
     @Provides
     @Named(ENV_VAR_TRANSAC_QUEUE_URL)
     @Singleton
-    public String provideTransacQueueURL() {
-        return "https://sqs.us-west-2.amazonaws.com/185046651126/TransactionTaskQueue";
+    String provideTransacQueueURL(final EnvMap map) {
+        return map.get(ENV_VAR_TRANSAC_QUEUE_URL);
+    }
+
+    @Provides
+    @Named(ENV_VAR_SERVER_PORT)
+    int providePort(final EnvMap env) {
+        return Integer.parseInt(env.get(ENV_VAR_SERVER_PORT));
+    }
+
+    @Provides
+    @Named(ENV_VAR_RPC_USE_VALIDATION)
+    boolean provideEnableValidation(final EnvMap env) {
+        return Boolean.parseBoolean(env.get(ENV_VAR_RPC_USE_VALIDATION));
     }
 }

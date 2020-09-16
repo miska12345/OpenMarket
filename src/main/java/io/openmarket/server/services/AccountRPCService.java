@@ -2,10 +2,7 @@ package io.openmarket.server.services;
 
 import io.grpc.stub.StreamObserver;
 import io.openmarket.account.grpc.AccountGrpc;
-import io.openmarket.account.grpc.AccountService.LoginRequest;
-import io.openmarket.account.grpc.AccountService.LoginResult;
-import io.openmarket.account.grpc.AccountService.RegistrationRequest;
-import io.openmarket.account.grpc.AccountService.RegistrationResult;
+import io.openmarket.account.grpc.AccountService.*;
 import io.openmarket.account.service.AccountServiceHandler;
 
 import javax.inject.Inject;

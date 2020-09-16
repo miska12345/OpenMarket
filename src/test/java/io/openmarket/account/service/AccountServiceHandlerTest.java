@@ -1,12 +1,7 @@
 package io.openmarket.account.service;
 
 import io.openmarket.account.AccountTestTemplateLocalDB;
-import io.openmarket.account.grpc.AccountService.LoginRequest;
-import io.openmarket.account.grpc.AccountService.LoginResult;
-import io.openmarket.account.grpc.AccountService.RegistrationRequest;
-import io.openmarket.account.grpc.AccountService.RegistrationResult;
-import io.openmarket.account.grpc.AccountService.UpdateRequest;
-import io.openmarket.account.grpc.AccountService.UpdateResult;
+import io.openmarket.account.grpc.AccountService.*;
 import io.openmarket.account.model.Account;
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +26,8 @@ public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
     public void cannot_Register_when_user_exists() {
         ash.register(RegistrationRequest.newBuilder().setUsername("weifeng1")
                 .setPassword("123").setDisplayName("didntpay").build());
-        RegistrationResult result = this.ash.register(RegistrationRequest.newBuilder().setUsername("weifeng1")
+        RegistrationResult result = this.ash
+                .register(RegistrationRequest.newBuilder().setUsername("weifeng1")
                 .setPassword("123").setDisplayName("didntpay").build());
         assertEquals(RegistrationResult.Status.USERNAME_ALREADY_EXIST, result.getRegisterStatus());
     }

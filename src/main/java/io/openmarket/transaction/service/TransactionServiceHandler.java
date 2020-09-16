@@ -38,6 +38,7 @@ public class TransactionServiceHandler {
         this.transactionDao = transactionDao;
         this.sqsPublisher = sqsPublisher;
         this.queueURL = queueURL;
+        log.info("TransactionServiceHandler started");
     }
 
     public TransactionProto.PaymentResult handlePayment(@NonNull final TransactionProto.PaymentRequest request) {
