@@ -40,7 +40,7 @@ public class AccountTestTemplateLocalDB {
         this.dbClient = localDBClient.amazonDynamoDB();
         this.dbMapper = new DynamoDBMapper(dbClient);
         this.userDao = new UserDaoImpl(dbClient, dbMapper);
-        this.ash = new AccountServiceHandler(userDao, new CredentialManager(false, 24));
+        this.ash = new AccountServiceHandler(userDao, new CredentialManager(24));
     }
 
     @AfterAll

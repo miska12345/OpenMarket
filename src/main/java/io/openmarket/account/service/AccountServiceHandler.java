@@ -58,7 +58,7 @@ public final class AccountServiceHandler {
                     .build();
         }
 
-        String token = credentialManager.generateToken(user.getUsername(), new Date());
+        String token = credentialManager.generateToken(user.getUsername(), user.getUserId(), new Date());
 
         log.info("User " + username + "logged in with token" + token);
         return LoginResult.newBuilder().setUsername(user.getUsername())
