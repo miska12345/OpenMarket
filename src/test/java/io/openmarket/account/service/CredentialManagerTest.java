@@ -25,6 +25,7 @@ public class CredentialManagerTest {
     public void can_GenerateToken() {
         Date today = new Date();
         String token = credentialManager.generateToken(USERNAME, USERID, today);
+        System.out.println(token);
         assertNotNull(token);
         assertFalse(token.isEmpty());
     }

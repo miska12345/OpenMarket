@@ -11,6 +11,7 @@ import lombok.extern.log4j.Log4j2;
 
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Singleton;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Collections;
@@ -19,6 +20,7 @@ import java.util.Map;
 
 import static io.openmarket.config.EnvironmentConfig.ENV_VAR_TOKEN_DURATION;
 
+@Singleton
 @Log4j2
 public final class CredentialManager {
     private static final int KEY_LENGTH = 256;

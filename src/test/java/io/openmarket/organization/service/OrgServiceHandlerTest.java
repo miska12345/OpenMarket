@@ -1,4 +1,4 @@
-package io.openmarket;
+package io.openmarket.organization.service;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
@@ -195,9 +195,6 @@ public class OrgServiceHandlerTest {
         assertEquals(testOrg.getOrgDescription(), "Description");
 
     }
-
-
-
 
     @AfterAll
     public static void teardown() {

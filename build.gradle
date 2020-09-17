@@ -57,6 +57,7 @@ dependencies {
     compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.13.3'
 
     implementation 'com.github.miska12345:OpenMarket-Dao:master-SNAPSHOT'
+    implementation 'com.github.didntpay:OpenMarketCommon:master-SNAPSHOT'
 
     implementation platform('com.amazonaws:aws-java-sdk-bom:1.11.859')
     implementation 'com.amazonaws:aws-java-sdk-s3'

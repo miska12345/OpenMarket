@@ -3,6 +3,7 @@ package io.openmarket.dagger.component;
 import dagger.Component;
 import io.openmarket.dagger.module.EnvMap;
 import io.openmarket.dagger.module.OpenMarketModule;
+import io.openmarket.server.OpenMarketInterceptor;
 import io.openmarket.server.Server;
 import io.openmarket.server.services.AccountRPCService;
 import io.openmarket.server.services.OrganizationRPCService;
@@ -17,4 +18,5 @@ public interface OpenMarketComponent {
     AccountRPCService buildAccountService();
     OrganizationRPCService buildOrgService();
     Server buildServer();
+    OpenMarketInterceptor buildInterceptor();
 }
