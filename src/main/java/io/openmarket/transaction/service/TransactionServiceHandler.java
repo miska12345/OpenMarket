@@ -43,8 +43,8 @@ public class TransactionServiceHandler {
 
     public TransactionProto.PaymentResult handlePayment(@NonNull final TransactionProto.PaymentRequest request) {
         if (!isPaymentRequestValid(request)) {
-            log.error("Transfer request is invalid: {}", request);
-            throw new IllegalArgumentException(String.format("The given transfer request contains invalid params: %s",
+            log.error("Payment request is invalid: {}", request);
+            throw new IllegalArgumentException(String.format("The given request contains invalid params: %s",
                     request));
         }
         final String transactionID = TransactionUtils.generateTransactionID();
@@ -52,8 +52,8 @@ public class TransactionServiceHandler {
                 .transactionId(transactionID)
                 .recipientId(request.getRecipientId())
                 .payerId(request.getPayerId())
-                .currencyId(request.getCurrencyId())
-                .amount(request.getAmount())
+                .currencyId(request.getMoneyAmount().getCurrencyId())
+                .amount(request.getMoneyAmount().getAmount())
                 .status(TRANSACTION_INITIAL_STATUS)
                 .type(TransactionType.valueOf(request.getType().toString()))
                 .note(request.getNote())
@@ -110,8 +110,10 @@ public class TransactionServiceHandler {
                 .setTransactionId(t.getTransactionId())
                 .setCreatedAt(TimeUtils.formatDate(t.getCreatedAt()))
                 .setStatus(TransactionProto.QueryResultItem.Status.valueOf(t.getStatus().toString()))
-                .setCurrencyId(t.getCurrencyId())
-                .setAmount(t.getAmount())
+                .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder()
+                        .setCurrencyId(t.getCurrencyId())
+                        .setAmount(t.getAmount())
+                )
                 .setPayerId(t.getPayerId())
                 .setRecipientId(t.getRecipientId())
                 .setType(TransactionProto.QueryResultItem.Type.valueOf(t.getType().toString()))
@@ -120,8 +122,11 @@ public class TransactionServiceHandler {
 
     @VisibleForTesting
     protected boolean isPaymentRequestValid(final TransactionProto.PaymentRequest request) {
-        return !request.getCurrencyId().isEmpty() && request.getAmount() > 0 && !request.getRecipientId().isEmpty()
-                && !request.getRecipientId().isEmpty() && !request.getPayerId().isEmpty()
+        return !request.getMoneyAmount().getCurrencyId().isEmpty()
+                && request.getMoneyAmount().getAmount() > 0
+                && !request.getRecipientId().isEmpty()
+                && !request.getRecipientId().isEmpty()
+                && !request.getPayerId().isEmpty()
                 && !request.getPayerId().equals(request.getRecipientId());
     }
 }

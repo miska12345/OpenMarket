@@ -62,8 +62,8 @@ public class TransactionServiceHandlerTest {
         TransactionProto.QueryResultItem item = result.getItemsList().get(0);
         assertEquals(mockTransaction.getTransactionId(), item.getTransactionId());
         assertEquals(mockTransaction.getTransactionId(), item.getTransactionId());
-        assertEquals(mockTransaction.getCurrencyId(), item.getCurrencyId());
-        assertEquals(mockTransaction.getAmount(), item.getAmount());
+        assertEquals(mockTransaction.getCurrencyId(), item.getMoneyAmount().getCurrencyId());
+        assertEquals(mockTransaction.getAmount(), item.getMoneyAmount().getAmount());
         assertEquals(mockTransaction.getStatus().toString(), item.getStatus().toString());
         assertEquals(mockTransaction.getPayerId(), item.getPayerId());
         assertEquals(mockTransaction.getRecipientId(), item.getRecipientId());
@@ -120,8 +120,7 @@ public class TransactionServiceHandlerTest {
         TransactionProto.PaymentRequest request = TransactionProto.PaymentRequest.newBuilder()
                 .setPayerId(PAYER_ID)
                 .setRecipientId(RECIPIENT_ID)
-                .setCurrencyId(CURRENCY_ID)
-                .setAmount(3.13)
+                .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder().setAmount(3.13).setCurrencyId(CURRENCY_ID))
                 .setNote("")
                 .setType(TransactionProto.PaymentRequest.Type.TRANSFER)
                 .build();
@@ -133,8 +132,8 @@ public class TransactionServiceHandlerTest {
                         && a.getRecipientId().equals(request.getRecipientId())
                         && a.getStatus().equals(TRANSACTION_INITIAL_STATUS)
                         && a.getError().equals(TRANSACTION_INITIAL_ERROR_TYPE)
-                        && a.getCurrencyId().equals(request.getCurrencyId())
-                        && a.getAmount().equals(request.getAmount())
+                        && a.getCurrencyId().equals(request.getMoneyAmount().getCurrencyId())
+                        && a.getAmount().equals(request.getMoneyAmount().getAmount())
                         && a.getNote().equals(request.getNote())
                 )
         );
@@ -168,8 +167,7 @@ public class TransactionServiceHandlerTest {
         TransactionProto.PaymentRequest request = TransactionProto.PaymentRequest.newBuilder()
                 .setPayerId(PAYER_ID)
                 .setRecipientId(PAYER_ID)
-                .setCurrencyId(CURRENCY_ID)
-                .setAmount(3.13)
+                .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder().setCurrencyId("321").setAmount(3.13))
                 .setNote("")
                 .setType(TransactionProto.PaymentRequest.Type.TRANSFER)
                 .build();
@@ -187,10 +185,18 @@ public class TransactionServiceHandlerTest {
         return Stream.of(
                 Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId("").build()),
                 Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId("").build()),
-                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(RECIPIENT_ID).setCurrencyId("").build()),
-                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(RECIPIENT_ID).setCurrencyId(CURRENCY_ID).setAmount(0).build()),
-                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(RECIPIENT_ID).setCurrencyId(CURRENCY_ID).setAmount(-1).build()),
-                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID).setRecipientId(PAYER_ID).setCurrencyId(CURRENCY_ID).setAmount(1.3).build())
+                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID)
+                        .setRecipientId(RECIPIENT_ID)
+                        .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder().setCurrencyId("")).build()),
+                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID)
+                        .setRecipientId(RECIPIENT_ID)
+                        .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder().setCurrencyId(CURRENCY_ID).setAmount(0)).build()),
+                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID)
+                        .setRecipientId(RECIPIENT_ID)
+                        .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder().setCurrencyId(CURRENCY_ID).setAmount(-1)).build()),
+                Arguments.of(TransactionProto.PaymentRequest.newBuilder().setPayerId(PAYER_ID)
+                        .setRecipientId(PAYER_ID)
+                        .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder().setCurrencyId(CURRENCY_ID).setAmount(3.2)).build())
         );
     }
 
