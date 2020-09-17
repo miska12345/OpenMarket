@@ -58,6 +58,15 @@ public final class CredentialManager {
         return Collections.emptyMap();
     }
 
+    public Map<String, Claim> getClaimsUnverified(@NonNull final String token) {
+        try {
+            return JWT.decode(token).getClaims();
+        } catch (Exception e) {
+            log.error("Failed to decode token {}", token);
+            return Collections.emptyMap();
+        }
+    }
+
     public String generateToken(@NonNull final String username,
                                 @NonNull final String userId,
                                 @NonNull final Date today) {

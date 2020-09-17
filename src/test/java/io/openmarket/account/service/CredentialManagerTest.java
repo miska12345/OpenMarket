@@ -1,12 +1,14 @@
 package io.openmarket.account.service;
 
 import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import io.openmarket.utils.TimeUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -59,5 +61,17 @@ public class CredentialManagerTest {
     @Test
     public void can_Generate_Server_Key() {
         assertDoesNotThrow(CredentialManager::getSecureServerKey);
+    }
+
+    @Test
+    public void can_Decode_Good_Token() {
+        Map<String, Claim> map = credentialManager.getClaimsUnverified(credentialManager.generateToken(USERNAME, USERID, new Date()));
+        assertFalse(map.isEmpty());
+    }
+
+    @Test
+    public void cannot_Decode_Bad_Token() {
+        Map<String, Claim> map = credentialManager.getClaimsUnverified("123.2.3");
+        assertTrue(map.isEmpty());
     }
 }
