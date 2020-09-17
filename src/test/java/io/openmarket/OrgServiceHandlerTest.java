@@ -7,14 +7,11 @@ import com.amazonaws.services.dynamodbv2.local.shared.access.AmazonDynamoDBLocal
 import com.amazonaws.services.dynamodbv2.model.*;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import io.openmarket.organization.OrgServiceHandler;
 import io.openmarket.organization.dao.OrgDaoImpl;
 import io.openmarket.organization.model.Organization;
-import io.openmarket.organization.service.OrgServiceHandler;
 import org.junit.jupiter.api.*;
 import organization.OrganizationOuterClass;
-
-import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 
 import static io.openmarket.config.OrgConfig.ORG_DDB_ATTRIBUTE_NAME;

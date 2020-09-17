@@ -1,26 +1,30 @@
-package io.openmarket.organization.service;
+package io.openmarket.organization;
+
+
 import com.google.common.collect.ImmutableSet;
-import io.openmarket.organization.dao.OrgDaoImpl;
+import io.openmarket.organization.dao.OrgDao;
 import io.openmarket.organization.model.Organization;
 import lombok.extern.log4j.Log4j2;
 import organization.OrganizationOuterClass;
 
+import javax.inject.Inject;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
 @Log4j2
 public class OrgServiceHandler {
-    protected OrgDaoImpl orgDao;
+    protected OrgDao orgDao;
 
-
-    public OrgServiceHandler (OrgDaoImpl orgDao) {
+    @Inject
+    public OrgServiceHandler (OrgDao orgDao) {
         this.orgDao = orgDao;
     }
 
-    public void addOrgRquest(OrganizationOuterClass.orgMetadata params) {
+    public OrganizationOuterClass.orgName addOrgRquest(OrganizationOuterClass.orgMetadata params) {
         Organization org = this.orgMetadata2Org(params);
         this.addOrg(org);
+        return OrganizationOuterClass.orgName.newBuilder().setOrgName(params.getOrgName()).build();
     }
 
     public void addOrg(Organization org) {
@@ -72,7 +76,7 @@ public class OrgServiceHandler {
         orgDao.save(org);
     }
 
-    public void partialUpdateRequest(OrganizationOuterClass.orgMetadata params) {
+    public OrganizationOuterClass.orgName partialUpdateRequest(OrganizationOuterClass.orgMetadata params) {
         if (params.getOrgName().isEmpty()) {
             log.error("Missing organization name!");
             throw new IllegalArgumentException("Missing organization name!");
@@ -88,6 +92,7 @@ public class OrgServiceHandler {
         if (!params.getOrgPortraitS3Key().isEmpty()) updated_org.setOrgPortraitS3Key(params.getOrgPortraitS3Key());
 
         orgDao.save(updated_org);
+        return OrganizationOuterClass.orgName.newBuilder().setOrgName(params.getOrgName()).build();
     }
 
     private Organization orgMetadata2Org (OrganizationOuterClass.orgMetadata params) {
