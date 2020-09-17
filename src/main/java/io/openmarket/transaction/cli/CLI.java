@@ -63,8 +63,7 @@ public class CLI {
         System.out.println("Enter payerId");
         String payer = scanner.nextLine();
         TransactionProto.PaymentRequest payment = TransactionProto.PaymentRequest.newBuilder()
-                .setCurrencyId("123")
-                .setAmount(3.21)
+                .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder().setCurrencyId("666").setAmount(3.0))
                 .setPayerId(payer)
                 .setRecipientId("321")
                 .setType(TransactionProto.PaymentRequest.Type.TRANSFER)
