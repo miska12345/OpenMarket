@@ -2,8 +2,8 @@ package io.openmarket.server;
 
 
 import io.grpc.ServerBuilder;
-import io.openmarket.dagger.component.DaggerOpenMarketComponent;
 import io.openmarket.server.services.AccountRPCService;
+import io.openmarket.server.services.OrganizationRPCService;
 import io.openmarket.server.services.TransactionRPCService;
 import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
@@ -19,13 +19,17 @@ public class Server {
     private final io.grpc.Server server;
 
     @Inject
-    public Server(@Named(ENV_VAR_SERVER_PORT) int port, @NonNull final AccountRPCService accountService,
-                      @NonNull final TransactionRPCService transactionService, OpenMarketInterceptor interceptor) {
+    public Server(@Named(ENV_VAR_SERVER_PORT) int port,
+                  @NonNull final AccountRPCService accountService,
+                  @NonNull final TransactionRPCService transactionService,
+                  @NonNull final OrganizationRPCService orgSerice,
+                  @NonNull final OpenMarketInterceptor interceptor) {
         this.port = port;
         this.server = ServerBuilder
                 .forPort(port)
                 .addService(accountService)
                 .addService(transactionService)
+                .addService(orgSerice)
                 .intercept(interceptor)
                 .build();
     }

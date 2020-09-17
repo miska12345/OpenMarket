@@ -3,6 +3,7 @@ package io.openmarket.server.config;
 import com.google.common.collect.ImmutableSet;
 import io.grpc.Context;
 import io.grpc.Metadata;
+import io.openmarket.config.GlobalConfig;
 
 import java.util.Set;
 
@@ -12,7 +13,8 @@ public class InterceptorConfig {
     /**
      * The metadata key for authorization credential
      */
-    public static final Metadata.Key<String> AUTHORIZATION_METADATA_KEY = Metadata.Key.of("AuthToken", ASCII_STRING_MARSHALLER);
+    public static final Metadata.Key<String> AUTHORIZATION_METADATA_KEY = Metadata
+            .Key.of(GlobalConfig.ATTR_AUTHENTICATION_TOKEN, ASCII_STRING_MARSHALLER);
 
     /**
      *The context key for the user id

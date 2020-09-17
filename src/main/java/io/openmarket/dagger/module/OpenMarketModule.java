@@ -5,6 +5,9 @@ import dagger.Provides;
 import io.openmarket.account.dynamodb.UserDao;
 import io.openmarket.account.service.AccountServiceHandler;
 import io.openmarket.account.service.CredentialManager;
+import io.openmarket.organization.OrgServiceHandler;
+import io.openmarket.organization.dao.OrgDao;
+
 import io.openmarket.transaction.dao.dynamodb.TransactionDao;
 import io.openmarket.transaction.dao.sqs.SQSTransactionTaskPublisher;
 import io.openmarket.transaction.service.TransactionServiceHandler;
@@ -28,6 +31,12 @@ public class OpenMarketModule {
     @Singleton
     AccountServiceHandler provideAccountHandler(final UserDao userDao, final CredentialManager credManager) {
         return new AccountServiceHandler(userDao, credManager);
+    }
+
+    @Provides
+    @Singleton
+    OrgServiceHandler provideOrgHandler(final OrgDao orgDao) {
+        return new OrgServiceHandler(orgDao);
     }
 
     @Provides
