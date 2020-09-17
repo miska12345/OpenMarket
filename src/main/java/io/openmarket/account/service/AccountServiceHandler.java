@@ -6,6 +6,7 @@ import io.openmarket.account.grpc.AccountService.*;
 import io.openmarket.account.model.Account;
 import lombok.extern.log4j.Log4j2;
 
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidParameterException;
@@ -26,8 +27,7 @@ public final class AccountServiceHandler {
         log.info("AccountServiceHandler started");
     }
 
-    public LoginResult login(LoginRequest loginRequest) {
-        if (loginRequest == null) throw new IllegalArgumentException();
+    public LoginResult login(@Nonnull final LoginRequest loginRequest) {
 
         if (loginRequest.getUsername().isEmpty() || loginRequest.getPassword().isEmpty()) {
             log.info("Reqeuset contains invalid param");
@@ -60,14 +60,13 @@ public final class AccountServiceHandler {
 
         String token = credentialManager.generateToken(user.getUsername(), user.getUserId(), new Date());
 
-        log.info("User " + username + "logged in with token" + token);
+        log.info("User " + username + "logged in with token " + token);
         return LoginResult.newBuilder().setUsername(user.getUsername())
                 .setLoginStatus(LoginResult.Status.LOGIN_SUCCESS)
                 .setCred(token).build();
     }
 
-    public RegistrationResult register(RegistrationRequest request) {
-        if (request == null) throw new NullPointerException();
+    public RegistrationResult register(@Nonnull final RegistrationRequest request) {
 
         if (request.getPassword().isEmpty() || request.getDisplayName().isEmpty()
             ||request.getUsername().isEmpty()){
