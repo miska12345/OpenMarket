@@ -1,5 +1,6 @@
 package io.openmarket.server.services;
 
+import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 import io.openmarket.transaction.grpc.TransactionGrpc;
 import io.openmarket.transaction.grpc.TransactionProto;
@@ -19,7 +20,7 @@ public class TransactionRPCService extends TransactionGrpc.TransactionImplBase {
     @Override
     public void processPayment(@NonNull final TransactionProto.PaymentRequest request,
                                @NonNull final StreamObserver<TransactionProto.PaymentResult> responseObserver) {
-        responseObserver.onNext(handler.handlePayment(request));
+        responseObserver.onNext(handler.handlePayment(Context.current(), request));
         responseObserver.onCompleted();
     }
 
@@ -27,6 +28,13 @@ public class TransactionRPCService extends TransactionGrpc.TransactionImplBase {
     public void processQuery(@NonNull final TransactionProto.QueryRequest request,
                                @NonNull final StreamObserver<TransactionProto.QueryResult> responseObserver) {
         responseObserver.onNext(handler.handleQuery(request));
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void processRefund(@NonNull final TransactionProto.RefundRequest request,
+                              @NonNull final StreamObserver<TransactionProto.RefundResult> responseObserver) {
+        responseObserver.onNext(handler.handleRefund(Context.current(), request));
         responseObserver.onCompleted();
     }
 }

@@ -55,6 +55,7 @@ public class OpenMarketInterceptor implements io.grpc.ServerInterceptor {
                 log.info("Authorization failed with token " + token);
                 status = Status.PERMISSION_DENIED.withDescription("Invalid token");
             } else {
+                log.info("Authenticated user with name '{}'", result.get(CredentialManager.CLAIM_USERNAME).asString());
                 final Context ctx = Context.current()
                         .withValue(InterceptorConfig.USER_ID_CONTEXT_KEY, result.get(CredentialManager.CLAIM_USER_ID).asString())
                         .withValue(InterceptorConfig.USER_NAME_CONTEXT_KEY, result.get(CredentialManager.CLAIM_USERNAME).asString());
@@ -71,33 +72,51 @@ public class OpenMarketInterceptor implements io.grpc.ServerInterceptor {
     private static class ExceptionHandlingServerCallListener<ReqT, RespT>
         extends ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT> {
 
-        private ServerCall<ReqT, RespT> serverCall;
-        private Metadata metadata;
+        private final Context ctx;
+        private final ServerCall<ReqT, RespT> serverCall;
+        private final Metadata metadata;
 
         ExceptionHandlingServerCallListener(Context ctx, ServerCall.Listener<ReqT> listener, ServerCall<ReqT, RespT> serverCall,
                                             Metadata metadata) {
             super(listener);
+            this.ctx = ctx;
             this.serverCall = serverCall;
             this.metadata = metadata;
         }
 
         @Override
+        public void onMessage(final ReqT message) {
+            final Context previous = this.ctx.attach();
+            try {
+                super.onMessage(message);
+            } finally {
+                this.ctx.detach(previous);
+            }
+        }
+
+        @Override
         public void onHalfClose() {
+            final Context previous = this.ctx.attach();
             try {
                 super.onHalfClose();
             } catch (RuntimeException ex) {
                 handleException(ex, serverCall, metadata);
                 throw ex;
+            } finally {
+                ctx.detach(previous);
             }
         }
 
         @Override
         public void onReady() {
+            final Context previous = ctx.attach();
             try {
                 super.onReady();
             } catch (RuntimeException ex) {
                 handleException(ex, serverCall, metadata);
                 throw ex;
+            } finally {
+                ctx.detach(previous);
             }
         }
 
