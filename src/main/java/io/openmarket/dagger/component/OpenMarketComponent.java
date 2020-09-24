@@ -8,6 +8,7 @@ import io.openmarket.server.Server;
 import io.openmarket.server.services.AccountRPCService;
 import io.openmarket.server.services.OrganizationRPCService;
 import io.openmarket.server.services.TransactionRPCService;
+import io.openmarket.stamp.service.StampEventServiceHandler;
 
 import javax.inject.Singleton;
 
@@ -17,6 +18,7 @@ public interface OpenMarketComponent {
     TransactionRPCService buildTransacService();
     AccountRPCService buildAccountService();
     OrganizationRPCService buildOrgService();
+    StampEventServiceHandler buildStampEventService();
     Server buildServer();
     OpenMarketInterceptor buildInterceptor();
 }

@@ -7,6 +7,7 @@ import io.grpc.Context;
 import io.openmarket.server.config.InterceptorConfig;
 import io.openmarket.transaction.dao.dynamodb.TransactionDao;
 import io.openmarket.transaction.dao.sqs.SQSTransactionTaskPublisher;
+import io.openmarket.transaction.exception.InvalidTransactionException;
 import io.openmarket.transaction.grpc.TransactionProto;
 import io.openmarket.transaction.model.Transaction;
 import io.openmarket.transaction.model.TransactionErrorType;
@@ -279,6 +280,20 @@ public class TransactionServiceHandlerTest {
                         .transactionId(TEST_TRANSACTION_ID)
                         .build())
         );
+    }
+
+    @Test
+    public void test_GetTransactionStatus() {
+        Transaction transaction = generateTransaction(TEST_TRANSACTION_ID);
+        when(transactionDao.load(TEST_TRANSACTION_ID)).thenReturn(Optional.of(transaction));
+        TransactionStatus status = handler.getTransactionStatus(TEST_TRANSACTION_ID);
+        assertEquals(TransactionStatus.PENDING, status);
+    }
+
+    @Test
+    public void test_GetTransactionStatus_Throw_Exception_If_Not_Exists() {
+        when(transactionDao.load(TEST_TRANSACTION_ID)).thenReturn(Optional.empty());
+        assertThrows(InvalidTransactionException.class, () -> handler.getTransactionStatus(TEST_TRANSACTION_ID));
     }
 
     private Transaction getRefundedTransaction() {
