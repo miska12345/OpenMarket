@@ -51,26 +51,8 @@ public class TransactionServiceHandler {
     public TransactionProto.PaymentResult handlePayment(@NonNull final Context context,
                                                         @NonNull final TransactionProto.PaymentRequest request) {
         final String payerId = InterceptorConfig.USER_NAME_CONTEXT_KEY.get(context);
-        if (!isPaymentRequestValid(request)
-                || request.getRecipientId().equals(payerId)) {
-            log.error("Payment requested by '{}' is invalid: {}", payerId, request);
-            throw new IllegalArgumentException(String.format("The given request contains invalid params: %s",
-                    request));
-        }
-        final String transactionID = TransactionUtils.generateTransactionID();
-        final Transaction transaction = Transaction.builder()
-                .transactionId(transactionID)
-                .payerId(payerId)
-                .recipientId(request.getRecipientId())
-                .currencyId(request.getMoneyAmount().getCurrencyId())
-                .amount(request.getMoneyAmount().getAmount())
-                .status(TRANSACTION_INITIAL_STATUS)
-                .type(TransactionType.valueOf(request.getType().toString()))
-                .note(request.getNote())
-                .error(TRANSACTION_INITIAL_ERROR_TYPE)
-                .build();
-        createTransaction(transaction);
-        return TransactionProto.PaymentResult.newBuilder().setTransactionId(transactionID).build();
+        final String transactionId = createPayment(payerId, request);
+        return TransactionProto.PaymentResult.newBuilder().setTransactionId(transactionId).build();
     }
 
     public TransactionProto.QueryResult handleQuery(@NonNull final TransactionProto.QueryRequest request) {
@@ -131,6 +113,34 @@ public class TransactionServiceHandler {
             throw new IllegalStateException("Refund not created, try again later.");
         }
         return convertTransactionToRefundResult(transactionDao.load(refundTransaction.getTransactionId()).get());
+    }
+
+    public TransactionStatus getTransactionStatus(@NonNull final String transactionId) {
+        final Transaction transaction = transactionDao.load(transactionId)
+                .orElseThrow(() -> new InvalidTransactionException("Transaction ID is invalid"));
+        return transaction.getStatus();
+    }
+
+    public String createPayment(final String payerId, TransactionProto.PaymentRequest request) {
+        if (!isPaymentRequestValid(request)
+                || request.getRecipientId().equals(payerId)) {
+            log.error("Payment requested by '{}' is invalid: {}", payerId, request);
+            throw new IllegalArgumentException(String.format("The given request contains invalid params: %s",
+                    request));
+        }
+        final Transaction transaction = Transaction.builder()
+                .transactionId(TransactionUtils.generateTransactionID())
+                .payerId(payerId)
+                .recipientId(request.getRecipientId())
+                .currencyId(request.getMoneyAmount().getCurrencyId())
+                .amount(request.getMoneyAmount().getAmount())
+                .status(TRANSACTION_INITIAL_STATUS)
+                .type(TransactionType.valueOf(request.getType().toString()))
+                .note(request.getNote())
+                .error(TRANSACTION_INITIAL_ERROR_TYPE)
+                .build();
+        createTransaction(transaction);
+        return transaction.getTransactionId();
     }
 
     private void createRefundTransactionPair(final Transaction source, final Transaction refundTransaction) {
