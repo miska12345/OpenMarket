@@ -4,11 +4,9 @@ import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import com.google.common.collect.ImmutableMap;
-import io.grpc.Context;
 import io.openmarket.marketplace.dao.ItemDao;
 import io.openmarket.marketplace.grpc.MarketPlaceProto.*;
 import io.openmarket.marketplace.model.Item;
-import io.openmarket.server.config.InterceptorConfig;
 import io.openmarket.transaction.grpc.TransactionProto;
 import io.openmarket.transaction.model.TransactionStatus;
 import io.openmarket.transaction.service.TransactionServiceHandler;
@@ -17,7 +15,6 @@ import lombok.extern.log4j.Log4j2;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static io.openmarket.config.MerchandiseConfig.*;
 
@@ -26,7 +23,7 @@ public class MarketPlaceServiceHandler {
     private final ItemDao itemDao;
     private final TransactionServiceHandler transactionServiceHandler;
 
-    //the checkout is aborted after checking transaction status for 10 second
+    //the checkout is aborted after checking transaction status for 20 second
     private final int CHECKOUT_TIMEOUT = 20;
     private final int CHECKOUT_QUERY_DELAY = 2000;
     @Inject
@@ -35,7 +32,6 @@ public class MarketPlaceServiceHandler {
         this.itemDao = itemDao;
         this.transactionServiceHandler = transactionServiceHandler;
     }
-//    public String getOwner()
 
 
     public GetOrgItemsResult getListingByOrgId(GetOrgItemsRequest request) {
@@ -59,16 +55,6 @@ public class MarketPlaceServiceHandler {
         return GetOrgItemsResult.newBuilder().addAllItems(result).build();
     }
 
-//    final UpdateItemRequest updateRequest = new UpdateItemRequest().withTableName(MER_DDB_TABLE_NAME)
-//            .withKey(ImmutableMap.of(MER_DDB_ATTRIBUTE_ID, new AttributeValue(itemId)))
-//            .withUpdateExpression("SET #count = #count - :purchased")
-//            .withConditionExpression("#count >= :purchased")
-//            .withExpressionAttributeNames(
-//                    ImmutableMap.of("#count", MER_DDB_ATTRIBUTE_STOCK)
-//            ).withExpressionAttributeValues(
-//                    ImmutableMap.of(":purchased", new AttributeValue().withN(String.valueOf(count)))
-//            );
-
     public CheckOutResult checkout(String uesrId, CheckOutRequest request) {
         List<ItemGrpc> items = request.getItemsList();
         List<Integer> itemCounts = request.getCountList();
@@ -82,7 +68,7 @@ public class MarketPlaceServiceHandler {
         log.info("Checkout received from {} buying from {}",
                 uesrId, request.getFromOrg());
 
-        //puts item on hold so
+        //puts item on hold, not finalized until transcation is processed correctly
        CheckOutResult result = updateItemDB(items, itemCounts, null);
 
        if (result.getUnprocessedItemCount() == items.size()) return result;
@@ -110,7 +96,8 @@ public class MarketPlaceServiceHandler {
 
         if(!checkTransactionStatus(transactionId)) {
             log.error("Transaction timed out");
-            updateItemDB(items, itemCounts,unprocessed);
+            //revert item from on hold to available again
+            updateItemDB(items, itemCounts, unprocessed);
             return CheckOutResult.newBuilder()
                     .setCheckoutStatus(CheckOutResult.Status.FAIL_TRANSACTION_TIME_OUT)
                     .addAllUnprocessedItem(items)
