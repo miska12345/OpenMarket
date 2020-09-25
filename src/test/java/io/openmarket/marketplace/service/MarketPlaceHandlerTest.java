@@ -7,21 +7,13 @@ import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import com.google.common.collect.ImmutableList;
 import io.grpc.Context;
-import io.grpc.Status;
-import io.openmarket.account.dynamodb.UserDao;
-import io.openmarket.account.dynamodb.UserDaoImpl;
-import io.openmarket.account.service.AccountServiceHandler;
-import io.openmarket.account.service.CredentialManager;
 import io.openmarket.marketplace.MarketPlaceServiceHandler;
 import io.openmarket.marketplace.dao.ItemDao;
 import io.openmarket.marketplace.dao.ItemDaoImpl;
 import io.openmarket.marketplace.grpc.MarketPlaceProto;
 import io.openmarket.marketplace.model.Item;
 import io.openmarket.server.config.InterceptorConfig;
-import io.openmarket.stamp.dao.dynamodb.StampEventDao;
-import io.openmarket.stamp.service.StampEventServiceHandler;
 import io.openmarket.transaction.dao.dynamodb.TransactionDao;
-import io.openmarket.transaction.dao.dynamodb.TransactionDaoImpl;
 import io.openmarket.transaction.model.TransactionStatus;
 import io.openmarket.transaction.service.TransactionServiceHandler;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,11 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 public class MarketPlaceHandlerTest {
-    protected static AmazonDynamoDBLocal localDBClient;
-    protected AmazonDynamoDB dbClient;
-    protected DynamoDBMapper dbMapper;
     protected ItemDao itemDao;
-    protected TransactionDao transactionDao;
     protected MarketPlaceServiceHandler marketPlaceServiceHandler;
     protected TransactionServiceHandler transactionServiceHandler;
 
@@ -64,7 +52,7 @@ public class MarketPlaceHandlerTest {
         when(transactionServiceHandler.createPayment(eq(MY_ID), any())).thenReturn(transactionID);
         when(transactionServiceHandler.getTransactionStatus(transactionID)).thenReturn(TransactionStatus.COMPLETED);
         MarketPlaceProto.CheckOutResult result = this.marketPlaceServiceHandler.checkout(MY_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
-                .addAllItems(getValidItemsGrpc()).addAllCount(getValidCount())
+                .addAllItems(getValidItemsGrpc())
                 .setFromOrg(ORG_NAME).setCurrencyId(CURRENCY_ID).build());
 
         assertEquals(0, result.getUnprocessedItemCount());
@@ -125,13 +113,13 @@ public class MarketPlaceHandlerTest {
 
     private MarketPlaceProto.CheckOutRequest getValidCheckoutRequest() {
         return MarketPlaceProto.CheckOutRequest.newBuilder()
-                .addAllItems(getValidItemsGrpc()).addAllCount(getValidCount())
+                .addAllItems(getValidItemsGrpc())
                 .setFromOrg(ORG_NAME).setCurrencyId(CURRENCY_ID).build();
     }
 
     private MarketPlaceProto.CheckOutRequest getPartialValidCheckoutRequest() {
         return MarketPlaceProto.CheckOutRequest.newBuilder()
-                .addAllItems(getSomeOutItemGrpc()).addAllCount(getSomeOutCount())
+                .addAllItems(getSomeOutItemGrpc())
                 .setFromOrg(ORG_NAME).setCurrencyId(CURRENCY_ID).build();
     }
 
@@ -141,11 +129,13 @@ public class MarketPlaceHandlerTest {
                         .setItemId("6778366f-78d4-46b7-8560-41aa40cd6b97")
                         .setItemName("Mac book prooo")
                         .setItemStock(1000)
+                        .setItemCount(1)
                         .setItemPrice(10).build(),
                 MarketPlaceProto.ItemGrpc.newBuilder()
                         .setItemId(ITEMID)
                         .setItemName("Mac book prooo")
                         .setItemStock(3)
+                        .setItemCount(1)
                         .setItemPrice(10).build()
         );
     }
@@ -155,6 +145,7 @@ public class MarketPlaceHandlerTest {
                 MarketPlaceProto.ItemGrpc.newBuilder()
                         .setItemId("6778366f-78d4-46b7-8560-41aa40cd6b97")
                         .setItemName("Mac book prooo")
+                        .setItemCount(1)
                         .setItemPrice(10).build()
         );
     }
@@ -164,7 +155,14 @@ public class MarketPlaceHandlerTest {
     }
 
     private Item getItem(String itemid) {
-        return Item.builder().stock(99).itemID(itemid).itemName("didntpay").belongTo("ChaCha").itemPrice(50.0).build();
+        return Item.builder().stock(99)
+                .itemID(itemid)
+                .itemName("didntpay")
+                .belongTo("ChaCha")
+                .itemCategory("foot waer")
+                .itemImageLink("wat")
+                .itemDescription("watever")
+                .itemPrice(50.0).build();
     }
 
     private List<Integer> getValidCount() {

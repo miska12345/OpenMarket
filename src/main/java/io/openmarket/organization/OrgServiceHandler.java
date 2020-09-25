@@ -3,9 +3,9 @@ package io.openmarket.organization;
 
 import com.google.common.collect.ImmutableSet;
 import io.openmarket.organization.dao.OrgDao;
+import io.openmarket.organization.grpc.OrganizationOuterClass;
 import io.openmarket.organization.model.Organization;
 import lombok.extern.log4j.Log4j2;
-import organization.OrganizationOuterClass;
 
 import javax.inject.Inject;
 import java.util.HashSet;

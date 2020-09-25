@@ -57,10 +57,9 @@ public class MarketPlaceServiceHandler {
 
     public CheckOutResult checkout(String uesrId, CheckOutRequest request) {
         List<ItemGrpc> items = request.getItemsList();
-        List<Integer> itemCounts = request.getCountList();
         double total = 0.0;
         boolean done = false;
-        if (items.size() != itemCounts.size()  || items.isEmpty()
+        if (items.isEmpty()
         || request.getCurrencyId().isEmpty() || request.getFromOrg().isEmpty())
             throw new IllegalArgumentException("Invalid order");
 
@@ -69,17 +68,17 @@ public class MarketPlaceServiceHandler {
                 uesrId, request.getFromOrg());
 
         //puts item on hold, not finalized until transcation is processed correctly
-       CheckOutResult result = updateItemDB(items, itemCounts, null);
+       CheckOutResult result = updateItemDB(items, null);
 
        if (result.getUnprocessedItemCount() == items.size()) return result;
 
        Set<ItemGrpc> unprocessed = new HashSet<>(result.getUnprocessedItemList());
        for (int i = 0; i < items.size(); i++) {
            ItemGrpc item = items.get(i);
-           int count = itemCounts.get(i);
 
            if (!unprocessed.contains(item)) {
-               total += this.itemDao.load(item.getItemId()).get().getItemPrice() * count;
+               Item dbItem = this.itemDao.load(item.getItemId()).get();
+               total += dbItem.getItemPrice() * item.getItemCount();
            }
        }
 
@@ -97,7 +96,7 @@ public class MarketPlaceServiceHandler {
         if(!checkTransactionStatus(transactionId)) {
             log.error("Transaction timed out");
             //revert item from on hold to available again
-            updateItemDB(items, itemCounts, unprocessed);
+            updateItemDB(items, unprocessed);
             return CheckOutResult.newBuilder()
                     .setCheckoutStatus(CheckOutResult.Status.FAIL_TRANSACTION_TIME_OUT)
                     .addAllUnprocessedItem(items)
@@ -122,7 +121,7 @@ public class MarketPlaceServiceHandler {
         return false;
     }
 
-    private CheckOutResult updateItemDB(List<ItemGrpc> items, List<Integer> itemCounts, Set<ItemGrpc> unprocessed) {
+    private CheckOutResult updateItemDB(List<ItemGrpc> items, Set<ItemGrpc> unprocessed) {
         CheckOutResult.Builder response = CheckOutResult.newBuilder();
 
         for(int i = 0; i < items.size(); i++) {
@@ -147,7 +146,7 @@ public class MarketPlaceServiceHandler {
                             ImmutableMap.of("#count", ITEM_DDB_ATTRIBUTE_STOCK,
                             "#purchaseCount", ITEM_DDB_ATTRIBUTE_PURCHASE_COUNT)
                     ).withExpressionAttributeValues(
-                            ImmutableMap.of(":hold", new AttributeValue().withN(String.valueOf(itemCounts.get(i))),
+                            ImmutableMap.of(":hold", new AttributeValue().withN(String.valueOf(item.getItemCount())),
                                             ":val", new AttributeValue().withN("1")
                             )
                     );
