@@ -1,19 +1,14 @@
 package io.openmarket.marketplace.service;
 
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
-import com.amazonaws.services.dynamodbv2.local.shared.access.AmazonDynamoDBLocal;
+
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import com.google.common.collect.ImmutableList;
-import io.grpc.Context;
 import io.openmarket.marketplace.MarketPlaceServiceHandler;
 import io.openmarket.marketplace.dao.ItemDao;
 import io.openmarket.marketplace.dao.ItemDaoImpl;
 import io.openmarket.marketplace.grpc.MarketPlaceProto;
 import io.openmarket.marketplace.model.Item;
-import io.openmarket.server.config.InterceptorConfig;
-import io.openmarket.transaction.dao.dynamodb.TransactionDao;
 import io.openmarket.transaction.model.TransactionStatus;
 import io.openmarket.transaction.service.TransactionServiceHandler;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,17 +28,30 @@ public class MarketPlaceHandlerTest {
     protected MarketPlaceServiceHandler marketPlaceServiceHandler;
     protected TransactionServiceHandler transactionServiceHandler;
 
-    final String ITEM_NAME = "Mac book proooo";
-    final String CURRENCY_ID = "666";
-    final String ORG_NAME = "ChaCha";
-    final String MY_ID = "miska2";
-    final String ITEMID = "xxx";
-    final String transactionID = "ddd";
+    private final String ITEM_NAME = "Mac book proooo";
+    private final String CURRENCY_ID = "666";
+    private final String ORG_NAME = "ChaCha";
+    private final String MY_ID = "miska2";
+    private final String ITEMID = "xxx";
+    private final String ITEMID2 = "yyyy";
+    private final String transactionID = "ddd";
+    private final String VALID_CATEGORY = "Foot Wear";
     @BeforeEach
     public void setup() {
         this.itemDao = mock(ItemDaoImpl.class);
         this.transactionServiceHandler = mock(TransactionServiceHandler.class);
         this.marketPlaceServiceHandler = new MarketPlaceServiceHandler(itemDao, transactionServiceHandler);
+    }
+
+    @Test
+    public void can_get_similar_item_when_in_stock() {
+        when(this.itemDao.load(any())).thenReturn(Optional.of(getItem(ITEMID)));
+        when(this.itemDao.getItemIdByCategory(VALID_CATEGORY, 3)).thenReturn(ImmutableList.of(ITEMID, ITEMID));
+        when(this.itemDao.batchLoad(ImmutableList.of(ITEMID, ITEMID))).thenReturn(ImmutableList.of(getItem(ITEMID), getItem(ITEMID)));
+        MarketPlaceProto.GetSimilarItemsResult result = this.marketPlaceServiceHandler.getSimilarItem(getValidSimilarRequest());
+        assertEquals(2, result.getItemsCount());
+        assertEquals(ITEMID, result.getItems(0).getItemId());
+        assertEquals(ITEMID, result.getItems(1).getItemId());
     }
 
     @Test
@@ -117,6 +125,13 @@ public class MarketPlaceHandlerTest {
                 .setFromOrg(ORG_NAME).setCurrencyId(CURRENCY_ID).build();
     }
 
+    private MarketPlaceProto.GetSimilarItemsRequest getValidSimilarRequest() {
+        return MarketPlaceProto.GetSimilarItemsRequest.newBuilder()
+                .setItemCategory(VALID_CATEGORY)
+                .setItemIds(ITEMID2)
+                .setWithCount(2).build();
+    }
+
     private MarketPlaceProto.CheckOutRequest getPartialValidCheckoutRequest() {
         return MarketPlaceProto.CheckOutRequest.newBuilder()
                 .addAllItems(getSomeOutItemGrpc())
@@ -126,14 +141,14 @@ public class MarketPlaceHandlerTest {
     private List<MarketPlaceProto.ItemGrpc> getSomeOutItemGrpc() {
         return ImmutableList.of(
                 MarketPlaceProto.ItemGrpc.newBuilder()
-                        .setItemId("6778366f-78d4-46b7-8560-41aa40cd6b97")
-                        .setItemName("Mac book prooo")
+                        .setItemId(ITEMID2)
+                        .setItemName(ITEM_NAME)
                         .setItemStock(1000)
                         .setItemCount(1)
                         .setItemPrice(10).build(),
                 MarketPlaceProto.ItemGrpc.newBuilder()
                         .setItemId(ITEMID)
-                        .setItemName("Mac book prooo")
+                        .setItemName(ITEM_NAME)
                         .setItemStock(3)
                         .setItemCount(1)
                         .setItemPrice(10).build()
@@ -143,9 +158,10 @@ public class MarketPlaceHandlerTest {
     private List<MarketPlaceProto.ItemGrpc> getValidItemsGrpc() {
         return ImmutableList.of(
                 MarketPlaceProto.ItemGrpc.newBuilder()
-                        .setItemId("6778366f-78d4-46b7-8560-41aa40cd6b97")
-                        .setItemName("Mac book prooo")
                         .setItemCount(1)
+                        .setItemId(ITEMID)
+                        .setItemName(ITEM_NAME)
+                        .setCategory(VALID_CATEGORY)
                         .setItemPrice(10).build()
         );
     }
@@ -155,22 +171,12 @@ public class MarketPlaceHandlerTest {
     }
 
     private Item getItem(String itemid) {
-        return Item.builder().stock(99)
-                .itemID(itemid)
-                .itemName("didntpay")
-                .belongTo("ChaCha")
-                .itemCategory("foot waer")
-                .itemImageLink("wat")
-                .itemDescription("watever")
-                .itemPrice(50.0).build();
-    }
-
-    private List<Integer> getValidCount() {
-        return ImmutableList.of(1);
-    }
-
-    private Context getContext() {
-        return Context.current().withValue(InterceptorConfig.USER_NAME_CONTEXT_KEY, MY_ID);
+        return Item.builder().stock(99).itemID(itemid)
+                .itemName(ITEM_NAME).itemImageLink("xxx")
+                .belongTo(ORG_NAME).itemDescription("xxx")
+                .itemCategory(VALID_CATEGORY)
+                .itemPrice(50.0)
+                .build();
     }
 }
 

@@ -24,7 +24,7 @@ public class MarketPlaceServiceHandler {
     private final TransactionServiceHandler transactionServiceHandler;
 
     //the checkout is aborted after checking transaction status for 20 second
-    private final int CHECKOUT_TIMEOUT = 20;
+    private final int CHECKOUT_TIMEOUT = 10;
     private final int CHECKOUT_QUERY_DELAY = 2000;
     @Inject
     public MarketPlaceServiceHandler(@Nonnull final ItemDao itemDao,
@@ -33,32 +33,57 @@ public class MarketPlaceServiceHandler {
         this.transactionServiceHandler = transactionServiceHandler;
     }
 
-
     public GetOrgItemsResult getListingByOrgId(GetOrgItemsRequest request) {
         List<String> itemIds = this.itemDao.getItemIdsByOrg(request.getOrgId());
         List<Item> selling = this.itemDao.batchLoad(itemIds);
         List<ItemGrpc> result = new ArrayList<>();
 
         for(Item item : selling) {
-            result.add(
-                    ItemGrpc.newBuilder()
-                    .setItemName(item.getItemName()).setItemStock(item.getStock())
-                    .setBelongTo(item.getBelongTo())
-                    .setItemPrice(item.getItemPrice())
-                    .setItemDescription(item.getItemDescription())
-                    .setItemId(item.getItemID())
-                    .setItemImageLink(item.getItemImageLink())
-                    .build()
-            );
+            result.add(convertToGrpc(item));
         }
 
         return GetOrgItemsResult.newBuilder().addAllItems(result).build();
     }
 
+    private ItemGrpc convertToGrpc(Item item) {
+        return ItemGrpc.newBuilder()
+                .setItemName(item.getItemName()).setItemStock(item.getStock())
+                .setBelongTo(item.getBelongTo())
+                .setItemPrice(item.getItemPrice())
+                .setItemDescription(item.getItemDescription())
+                .setItemId(item.getItemID())
+                .setCategory(item.getItemCategory())
+                .setItemImageLink(item.getItemImageLink())
+                .build();
+    }
+
+    public GetSimilarItemsResult getSimilarItem(GetSimilarItemsRequest request) {
+        if (request.getItemIds().isEmpty() || request.getItemCategory().isEmpty())
+            throw new IllegalArgumentException("Invalid get item requests");
+
+        String itemid = request.getItemIds();
+        if (!this.itemDao.load(itemid).isPresent()) throw new IllegalArgumentException("Invalid item id");
+        log.info("Getting similar items for {}", itemid);
+        String category = request.getItemCategory();
+        int withCount = request.getWithCount();
+
+        //+1 to handle to the case when the item itself is in the return result
+        List<String> ids = this.itemDao.getItemIdByCategory(category, withCount + 1);
+        List<Item> similarItem = this.itemDao.batchLoad(ids);
+        GetSimilarItemsResult.Builder response = GetSimilarItemsResult.newBuilder();
+
+        for(Item item : similarItem) {
+            if (!item.getItemID().equals(itemid)) {
+                response.addItems(convertToGrpc(item));
+            }
+        }
+
+        return response.build();
+    }
+
     public CheckOutResult checkout(String uesrId, CheckOutRequest request) {
         List<ItemGrpc> items = request.getItemsList();
         double total = 0.0;
-        boolean done = false;
         if (items.isEmpty()
         || request.getCurrencyId().isEmpty() || request.getFromOrg().isEmpty())
             throw new IllegalArgumentException("Invalid order");
@@ -115,7 +140,7 @@ public class MarketPlaceServiceHandler {
             } else if (paymentStatus.equals(TransactionStatus.ERROR)) {
                 return false;
             }
-            try{ Thread.sleep(2000); }
+            try{ Thread.sleep(CHECKOUT_QUERY_DELAY); }
             catch (Exception e) { log.error(e.getStackTrace()); }
         }
         return false;

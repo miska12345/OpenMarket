@@ -1,5 +1,4 @@
 package io.openmarket.server.services;
-
 import io.openmarket.organization.OrgServiceHandler;
 import io.openmarket.organization.grpc.OrganizationGrpc;
 import io.openmarket.organization.grpc.OrganizationOuterClass;
