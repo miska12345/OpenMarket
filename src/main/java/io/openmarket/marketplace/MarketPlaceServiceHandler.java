@@ -45,6 +45,35 @@ public class MarketPlaceServiceHandler {
         return GetOrgItemsResult.newBuilder().addAllItems(result).build();
     }
 
+    public AddItemResult addItem(AddItemRequest request) {
+        ItemGrpc item = request.getItem();
+        if (!validateItemGrpc(item)) throw new IllegalArgumentException("Invalid add item request");
+
+        Item itemDb = Item.builder().itemName(item.getItemName())
+                .itemCategory(item.getCategory())
+                .itemDescription(item.getItemDescription())
+                .itemImageLink(item.getItemImageLink())
+                .itemPrice(item.getItemPrice())
+                .stock(item.getItemStock())
+                .belongTo(item.getBelongTo())
+                .purchasedCount(0)
+                .build();
+        this.itemDao.save(itemDb);
+        log.info("Created item with name {}, price {}, stock {}", item.getItemName()
+                , item.getItemPrice(), item.getItemStock());
+        return AddItemResult.newBuilder()
+                .setItemName(item.getItemName()).setAddStatus(AddItemResult.Status.SUCCESS).build();
+    }
+
+    private boolean validateItemGrpc(ItemGrpc target) {
+        if (target.getItemCount() < 1 || target.getItemName().isEmpty() || target.getCategory().isEmpty()
+        || target.getItemCount() < 1 || target.getItemPrice() < 0 || target.getBelongTo().isEmpty()
+        || target.getItemImageLink().isEmpty() || target.getItemStock() < 1){
+            return false;
+        }
+
+        return true;
+    }
     private ItemGrpc convertToGrpc(Item item) {
         return ItemGrpc.newBuilder()
                 .setItemName(item.getItemName()).setItemStock(item.getStock())
