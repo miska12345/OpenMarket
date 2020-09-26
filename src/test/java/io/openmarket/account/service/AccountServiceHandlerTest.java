@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
 
@@ -20,6 +22,7 @@ public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
         assertTrue(user1.isPresent());
         assertEquals("weifeng1", user1.get().getUsername());
 
+        verify(this.transactionServiceHandler, times(1)).createWalletForUser("weifeng1");
     }
 
     @Test

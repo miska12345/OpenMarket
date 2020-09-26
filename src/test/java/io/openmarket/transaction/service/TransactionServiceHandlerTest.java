@@ -3,6 +3,7 @@ package io.openmarket.transaction.service;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import io.grpc.Context;
 import io.openmarket.server.config.InterceptorConfig;
 import io.openmarket.transaction.dao.dynamodb.TransactionDao;
@@ -14,6 +15,8 @@ import io.openmarket.transaction.model.TransactionErrorType;
 import io.openmarket.transaction.model.TransactionStatus;
 import io.openmarket.transaction.model.TransactionType;
 import io.openmarket.transaction.utils.TransactionUtils;
+import io.openmarket.wallet.dao.dynamodb.WalletDao;
+import io.openmarket.wallet.model.Wallet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -34,8 +37,7 @@ import java.util.stream.Stream;
 import static io.openmarket.config.TransactionConfig.TRANSACTION_INITIAL_ERROR_TYPE;
 import static io.openmarket.config.TransactionConfig.TRANSACTION_INITIAL_STATUS;
 import static io.openmarket.transaction.grpc.TransactionProto.QueryRequest.QueryType.TRANSACTION_ID;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -50,15 +52,45 @@ public class TransactionServiceHandlerTest {
     private static final String TEST_TRANSACTION_ID = "123";
 
     private TransactionDao transactionDao;
+    private WalletDao walletDao;
     private SQSTransactionTaskPublisher sqsPublisher;
     private TransactionServiceHandler handler;
 
     @BeforeEach
     public void setup() {
         this.transactionDao = mock(TransactionDao.class);
+        this.walletDao = mock(WalletDao.class);
         this.sqsPublisher = mock(SQSTransactionTaskPublisher.class);
-        this.handler = new TransactionServiceHandler(transactionDao, sqsPublisher, QUEUE_URL);
+        this.handler = new TransactionServiceHandler(transactionDao, walletDao, sqsPublisher, QUEUE_URL);
     }
+
+    @Test
+    public void test_Get_Wallet_When_User_Exists() {
+        Map<String, Double> coins = ImmutableMap.of(CURRENCY_ID, AMOUNT);
+        when(walletDao.load(MY_ID))
+                .thenReturn(Optional.of(Wallet.builder().ownerId(MY_ID).coins(coins).build()));
+        TransactionProto.GetWalletResult result = handler
+                .getWallet(MY_ID, TransactionProto.GetWalletRequest.newBuilder().build());
+        assertEquals(coins, result.getCurrenciesMap());
+    }
+
+    @Test
+    public void test_Get_Wallet_Filter_Zeros() {
+        Map<String, Double> coins = ImmutableMap.of(CURRENCY_ID, AMOUNT, "111", 0.0);
+        when(walletDao.load(MY_ID))
+                .thenReturn(Optional.of(Wallet.builder().ownerId(MY_ID).coins(coins).build()));
+        TransactionProto.GetWalletResult result = handler
+                .getWallet(MY_ID, TransactionProto.GetWalletRequest.newBuilder().build());
+        assertEquals(1, result.getCurrenciesMap().size());
+        assertTrue(coins.containsKey(CURRENCY_ID));
+    }
+
+    @Test
+    public void test_Get_Wallet_When_User_Not_Exists() {
+        assertThrows(IllegalArgumentException.class, () -> handler
+                .getWallet(MY_ID, TransactionProto.GetWalletRequest.newBuilder().build()));
+    }
+
 
     @Test
     public void when_Query_By_ID_And_Exists_Then_Return() {
