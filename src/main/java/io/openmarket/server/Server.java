@@ -2,13 +2,11 @@ package io.openmarket.server;
 
 
 import io.grpc.ServerBuilder;
-import io.openmarket.server.services.AccountRPCService;
-import io.openmarket.server.services.OrganizationRPCService;
-import io.openmarket.server.services.StampEventRPCService;
-import io.openmarket.server.services.TransactionRPCService;
+import io.openmarket.server.services.*;
 import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
 
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Named;
 
@@ -25,7 +23,8 @@ public class Server {
                   @NonNull final TransactionRPCService transactionService,
                   @NonNull final OrganizationRPCService orgSerice,
                   @NonNull final StampEventRPCService eventService,
-                  @NonNull final OpenMarketInterceptor interceptor) {
+                  @NonNull final OpenMarketInterceptor interceptor,
+                  @Nonnull final MarketPlaceRPCService marketplaceService) {
         this.port = port;
         this.server = ServerBuilder
                 .forPort(port)
@@ -33,6 +32,7 @@ public class Server {
                 .addService(transactionService)
                 .addService(orgSerice)
                 .addService(eventService)
+                .addService(marketplaceService)
                 .intercept(interceptor)
                 .build();
     }
