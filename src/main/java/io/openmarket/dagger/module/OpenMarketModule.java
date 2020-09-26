@@ -12,6 +12,7 @@ import io.openmarket.stamp.service.StampEventServiceHandler;
 import io.openmarket.transaction.dao.dynamodb.TransactionDao;
 import io.openmarket.transaction.dao.sqs.SQSTransactionTaskPublisher;
 import io.openmarket.transaction.service.TransactionServiceHandler;
+import io.openmarket.wallet.dao.dynamodb.WalletDao;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -23,15 +24,18 @@ public class OpenMarketModule {
     @Provides
     @Singleton
     TransactionServiceHandler provideTransacHandler(final TransactionDao transacDao,
+                                                    final WalletDao walletDao,
                                                     final SQSTransactionTaskPublisher sqsPublisher,
                                                     @Named(ENV_VAR_TRANSAC_QUEUE_URL) final String queueURL) {
-        return new TransactionServiceHandler(transacDao, sqsPublisher, queueURL);
+        return new TransactionServiceHandler(transacDao, walletDao, sqsPublisher, queueURL);
     }
 
     @Provides
     @Singleton
-    AccountServiceHandler provideAccountHandler(final UserDao userDao, final CredentialManager credManager) {
-        return new AccountServiceHandler(userDao, credManager);
+    AccountServiceHandler provideAccountHandler(final UserDao userDao,
+                                                final CredentialManager credManager,
+                                                final TransactionServiceHandler transactionServiceHandler) {
+        return new AccountServiceHandler(userDao, credManager, transactionServiceHandler);
     }
 
     @Provides

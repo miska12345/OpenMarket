@@ -15,6 +15,7 @@ import io.openmarket.account.dynamodb.UserDao;
 import io.openmarket.account.dynamodb.UserDaoImpl;
 import io.openmarket.account.service.AccountServiceHandler;
 import io.openmarket.account.service.CredentialManager;
+import io.openmarket.transaction.service.TransactionServiceHandler;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -22,12 +23,14 @@ import org.junit.jupiter.api.BeforeEach;
 
 import static io.openmarket.config.AccountConfig.USER_DDB_ATTRIBUTE_USERNAME;
 import static io.openmarket.config.AccountConfig.USER_DDB_TABLE_NAME;
+import static org.mockito.Mockito.mock;
 
 public class AccountTestTemplateLocalDB {
     protected static AmazonDynamoDBLocal localDBClient;
     protected AmazonDynamoDB dbClient;
     protected DynamoDBMapper dbMapper;
     protected UserDao userDao;
+    protected TransactionServiceHandler transactionServiceHandler;
     protected AccountServiceHandler ash;
 
     @BeforeAll
@@ -40,7 +43,9 @@ public class AccountTestTemplateLocalDB {
         this.dbClient = localDBClient.amazonDynamoDB();
         this.dbMapper = new DynamoDBMapper(dbClient);
         this.userDao = new UserDaoImpl(dbClient, dbMapper);
-        this.ash = new AccountServiceHandler(userDao, new CredentialManager(24));
+        this.transactionServiceHandler = mock(TransactionServiceHandler.class);
+        this.ash = new AccountServiceHandler(userDao, new CredentialManager(24),
+                this.transactionServiceHandler);
     }
 
     @AfterAll

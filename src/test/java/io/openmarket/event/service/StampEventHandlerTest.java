@@ -64,9 +64,10 @@ public class StampEventHandlerTest {
                         && a.getMoneyAmount().getCurrencyId().equals(CURRENCY_ID)
                         && a.getMoneyAmount().getAmount() == REWARD_AMOUNT
                 ));
-        assertEquals(EventProto.Error.NONE, result.getError());
+        assertEquals(EventProto.Error.NOTHING, result.getError());
         assertEquals(event.getMessageOnSuccess(), result.getMessage());
         assertEquals(transactionId, result.getTransactionId());
+        assertEquals(event.getEventId(), result.getEvent().getEventId());
     }
 
     @Test
@@ -162,7 +163,7 @@ public class StampEventHandlerTest {
         when(eventDao.load(VALID_EVENT_ID)).thenReturn(Optional.of(getStampEvent(10.0)));
         EventProto.DeleteEventResult result = stampEventServiceHandler.deleteEvent(OWNER_ID,
                 EventProto.DeleteEventRequest.newBuilder().setEventId(VALID_EVENT_ID).build());
-        assertEquals(EventProto.Error.NONE, result.getError());
+        assertEquals(EventProto.Error.NOTHING, result.getError());
     }
 
     @Test
@@ -194,7 +195,7 @@ public class StampEventHandlerTest {
         EventProto.GetEventResult result = stampEventServiceHandler.getEvent(USER_ID, EventProto.GetEventRequest.newBuilder()
                 .setEventId(VALID_EVENT_ID)
                 .build());
-        assertEquals(EventProto.Error.NONE, result.getError());
+        assertEquals(EventProto.Error.NOTHING, result.getError());
         assertEquals(event.getEventId(), result.getEvent().getEventId());
     }
 

@@ -10,6 +10,8 @@ import io.openmarket.transaction.dao.dynamodb.TransactionDaoImpl;
 import io.openmarket.transaction.dao.sqs.SQSTransactionTaskPublisher;
 import io.openmarket.transaction.grpc.TransactionProto;
 import io.openmarket.transaction.service.TransactionServiceHandler;
+import io.openmarket.wallet.dao.dynamodb.WalletDao;
+import io.openmarket.wallet.dao.dynamodb.WalletDaoImpl;
 
 import java.util.Scanner;
 
@@ -44,9 +46,10 @@ public class CLI {
     private static void initialize() {
         scanner = new Scanner(System.in);
         AmazonDynamoDB dbClient = AmazonDynamoDBClientBuilder.standard().build();
+        WalletDao walletDao = new WalletDaoImpl(dbClient, new DynamoDBMapper(dbClient));
         SQSTransactionTaskPublisher sqsPublisher = new SQSTransactionTaskPublisher(AmazonSQSClientBuilder.standard().build());
         handler = new TransactionServiceHandler(new TransactionDaoImpl(dbClient, new DynamoDBMapper(dbClient)),
-                sqsPublisher, "https://sqs.us-west-2.amazonaws.com/185046651126/TransactionTaskQueue");
+                walletDao, sqsPublisher, "https://sqs.us-west-2.amazonaws.com/185046651126/TransactionTaskQueue");
         context = Context.current();
     }
 

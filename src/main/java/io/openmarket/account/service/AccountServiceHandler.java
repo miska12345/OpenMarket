@@ -4,6 +4,7 @@ import com.google.common.hash.Hashing;
 import io.openmarket.account.dynamodb.UserDao;
 import io.openmarket.account.grpc.AccountService.*;
 import io.openmarket.account.model.Account;
+import io.openmarket.transaction.service.TransactionServiceHandler;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nonnull;
@@ -19,11 +20,15 @@ public final class AccountServiceHandler {
 
     private final UserDao userDao;
     private final CredentialManager credentialManager;
+    private final TransactionServiceHandler transactionServiceHandler;
 
     @Inject
-    public AccountServiceHandler(UserDao userDao, CredentialManager cm) {
+    public AccountServiceHandler(UserDao userDao,
+                                 CredentialManager cm,
+                                 TransactionServiceHandler transactionServiceHandler) {
         this.userDao = userDao;
         this.credentialManager = cm;
+        this.transactionServiceHandler = transactionServiceHandler;
         log.info("AccountServiceHandler started");
     }
 
@@ -93,6 +98,8 @@ public final class AccountServiceHandler {
                 .passwordHash(hashedPass).passwordSalt(salt)
                 .displayName(displayName).build();
         this.userDao.save(newUser);
+
+        transactionServiceHandler.createWalletForUser(username);
 
         log.info("Registration completed, welcome " + username);
         return RegistrationResult.newBuilder()

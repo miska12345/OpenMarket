@@ -77,18 +77,8 @@ public class StampEventServiceHandler {
         final StampEvent event = optEvent.get();
         log.info("User '{}' inquires for event '{}'", userId, event.getEventId());
         return EventProto.GetEventResult.newBuilder()
-                .setError(EventProto.Error.NONE)
-                .setEvent(EventProto.Event.newBuilder()
-                        .setEventId(event.getEventId())
-                        .setCreatedAt(event.getCreatedAt().toString())
-                        .setCurrency(event.getCurrencyId())
-                        .setExpiresAt(event.getExpireAt().toString())
-                        .setOwner(event.getOwnerId())
-                        .setRemainingAmount(event.getRemainingAmount())
-                        .setTotalAmount(event.getTotalAmount())
-                        .setRewardAmount(event.getRewardAmount())
-                        .setType(EventProto.OwnerType.valueOf(event.getType().toString()))
-                        .build())
+                .setError(EventProto.Error.NOTHING)
+                .setEvent(convertToGRPCEvent(event))
                 .build();
     }
 
@@ -132,9 +122,10 @@ public class StampEventServiceHandler {
                 .build());
         log.info("Successfully redeemed user '{}' at event {}", userId, request.getEventId());
         return RedeemResult.newBuilder()
-                .setError(EventProto.Error.NONE)
+                .setError(EventProto.Error.NOTHING)
                 .setMessage(event.getMessageOnSuccess())
                 .setTransactionId(transactionId)
+                .setEvent(convertToGRPCEvent(event))
                 .build();
     }
 
@@ -172,7 +163,7 @@ public class StampEventServiceHandler {
         if (event.isPresent()) {
             if (event.get().getOwnerId().equals(userId)) {
                 eventDao.delete(event.get().getEventId());
-                error = EventProto.Error.NONE;
+                error = EventProto.Error.NOTHING;
             } else {
                 error = EventProto.Error.UNAUTHORIZED;
             }
@@ -196,6 +187,22 @@ public class StampEventServiceHandler {
                         ":awrd", new AttributeValue().withN(String.valueOf(event.getRewardAmount()))
                 ));
         eventDao.update(updateRequest);
+    }
+
+    private EventProto.Event convertToGRPCEvent(final StampEvent event) {
+        return EventProto.Event.newBuilder()
+                .setEventId(event.getEventId())
+                .setCreatedAt(event.getCreatedAt().toString())
+                .setCurrency(event.getCurrencyId())
+                .setExpiresAt(event.getExpireAt().toString())
+                .setOwner(event.getOwnerId())
+                .setRemainingAmount(event.getRemainingAmount())
+                .setTotalAmount(event.getTotalAmount())
+                .setRewardAmount(event.getRewardAmount())
+                .setType(EventProto.OwnerType.valueOf(event.getType().toString()))
+                .setSuccessMessage(event.getMessageOnSuccess())
+                .setErrorMessage(event.getMessageOnError())
+                .build();
     }
 
     private static boolean isRedeemRequestValid(final RedeemRequest request) {
