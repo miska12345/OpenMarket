@@ -6,6 +6,7 @@ import io.openmarket.dagger.module.OpenMarketModule;
 import io.openmarket.server.OpenMarketInterceptor;
 import io.openmarket.server.Server;
 import io.openmarket.server.services.AccountRPCService;
+import io.openmarket.server.services.OrderRPCService;
 import io.openmarket.server.services.OrganizationRPCService;
 import io.openmarket.server.services.TransactionRPCService;
 
@@ -19,4 +20,5 @@ public interface OpenMarketComponent {
     OrganizationRPCService buildOrgService();
     Server buildServer();
     OpenMarketInterceptor buildInterceptor();
+    OrderRPCService buildOrderService();
 }

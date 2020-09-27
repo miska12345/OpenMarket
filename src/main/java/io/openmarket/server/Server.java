@@ -3,6 +3,7 @@ package io.openmarket.server;
 
 import io.grpc.ServerBuilder;
 import io.openmarket.server.services.AccountRPCService;
+import io.openmarket.server.services.OrderRPCService;
 import io.openmarket.server.services.OrganizationRPCService;
 import io.openmarket.server.services.TransactionRPCService;
 import lombok.NonNull;
@@ -23,6 +24,7 @@ public class Server {
                   @NonNull final AccountRPCService accountService,
                   @NonNull final TransactionRPCService transactionService,
                   @NonNull final OrganizationRPCService orgSerice,
+                  @NonNull final OrderRPCService orderSerivce,
                   @NonNull final OpenMarketInterceptor interceptor) {
         this.port = port;
         this.server = ServerBuilder
@@ -30,6 +32,7 @@ public class Server {
                 .addService(accountService)
                 .addService(transactionService)
                 .addService(orgSerice)
+                .addService(orderSerivce)
                 .intercept(interceptor)
                 .build();
     }

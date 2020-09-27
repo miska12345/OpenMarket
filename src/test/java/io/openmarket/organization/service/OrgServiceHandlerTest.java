@@ -9,9 +9,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.openmarket.organization.OrgServiceHandler;
 import io.openmarket.organization.dao.OrgDaoImpl;
+import io.openmarket.organization.grpc.OrganizationOuterClass;
 import io.openmarket.organization.model.Organization;
 import org.junit.jupiter.api.*;
-import organization.OrganizationOuterClass;
 import java.util.Optional;
 
 import static io.openmarket.config.OrgConfig.ORG_DDB_ATTRIBUTE_NAME;
