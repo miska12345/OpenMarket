@@ -166,8 +166,6 @@ public class MarketPlaceServiceHandler {
             TransactionStatus paymentStatus = transactionServiceHandler.getTransactionStatus(transactionId);
             if (paymentStatus.equals(TransactionStatus.COMPLETED)){
                 return true;
-            } else if (paymentStatus.equals(TransactionStatus.ERROR)) {
-                return false;
             }
             try{ Thread.sleep(CHECKOUT_QUERY_DELAY); }
             catch (Exception e) { log.error(e.getStackTrace()); }
@@ -189,7 +187,7 @@ public class MarketPlaceServiceHandler {
             }
             else if (unprocessed != null && !unprocessed.contains(item)) {
                 updateExpression = "SET #count = #count + :hold, #purchaseCount = #purchaseCount - :val";
-                conditionExpression = "";
+                conditionExpression = null;
             }
 
             final UpdateItemRequest updateRequest = new UpdateItemRequest().withTableName(ITEM_DDB_TABLE_NAME)
@@ -202,6 +200,7 @@ public class MarketPlaceServiceHandler {
                     ).withExpressionAttributeValues(
                             ImmutableMap.of(":hold", new AttributeValue().withN(String.valueOf(item.getItemCount())),
                                             ":val", new AttributeValue().withN("1")
+                                    //TODO change the constant string 1 to itemCount
                             )
                     );
 
