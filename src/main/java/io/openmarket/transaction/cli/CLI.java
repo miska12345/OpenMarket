@@ -19,6 +19,7 @@ public class CLI {
     private static Scanner scanner;
     private static TransactionServiceHandler handler;
     private static Context context;
+    private static String MY_ID = "123";
     public static void main(String[] args) {
         initialize();
         handleInput();
@@ -58,7 +59,7 @@ public class CLI {
         TransactionProto.QueryRequest request = TransactionProto.QueryRequest.newBuilder()
                 .setType(TransactionProto.QueryRequest.QueryType.PAYER_ID)
                 .setParam(scanner.nextLine()).build();
-        TransactionProto.QueryResult result = handler.handleQuery(request);
+        TransactionProto.QueryResult result = handler.handleQuery(MY_ID, request);
         System.out.println(result.getItemsList());
     }
 
@@ -67,7 +68,7 @@ public class CLI {
         TransactionProto.QueryRequest request = TransactionProto.QueryRequest.newBuilder()
                 .setType(TransactionProto.QueryRequest.QueryType.TRANSACTION_ID)
                 .setParam(scanner.nextLine()).build();
-        TransactionProto.QueryResult result = handler.handleQuery(request);
+        TransactionProto.QueryResult result = handler.handleQuery(MY_ID, request);
         System.out.println(result.getItemsList());
     }
 

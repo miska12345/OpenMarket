@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.gson.Gson;
 import io.grpc.Context;
 import io.openmarket.server.config.InterceptorConfig;
 import io.openmarket.transaction.dao.dynamodb.TransactionDao;
@@ -36,6 +37,7 @@ import java.util.stream.Stream;
 
 import static io.openmarket.config.TransactionConfig.TRANSACTION_INITIAL_ERROR_TYPE;
 import static io.openmarket.config.TransactionConfig.TRANSACTION_INITIAL_STATUS;
+import static io.openmarket.transaction.grpc.TransactionProto.QueryRequest.QueryType.PAYER_ID;
 import static io.openmarket.transaction.grpc.TransactionProto.QueryRequest.QueryType.TRANSACTION_ID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -98,7 +100,7 @@ public class TransactionServiceHandlerTest {
         TransactionProto.QueryRequest request = TransactionProto.QueryRequest.newBuilder()
                 .setType(TRANSACTION_ID).setParam(mockTransaction.getTransactionId()).build();
         when(transactionDao.load(mockTransaction.getTransactionId())).thenReturn(Optional.of(mockTransaction));
-        TransactionProto.QueryResult result = handler.handleQuery(request);
+        TransactionProto.QueryResult result = handler.handleQuery(MY_ID, request);
         assertEquals(1, result.getItemsCount());
 
         TransactionProto.QueryResultItem item = result.getItemsList().get(0);
@@ -115,12 +117,13 @@ public class TransactionServiceHandlerTest {
     public void when_Query_With_Invalid_ID_Then_Throw_IllegalArgumentException() {
         TransactionProto.QueryRequest request = TransactionProto.QueryRequest.newBuilder()
                 .setType(TRANSACTION_ID).setParam("").build();
-        assertThrows(IllegalArgumentException.class, () -> handler.handleQuery(request));
+        assertThrows(IllegalArgumentException.class, () -> handler.handleQuery(MY_ID, request));
     }
 
     @ParameterizedTest
     @MethodSource("getQueryParam")
     public void test_Query(TransactionProto.QueryRequest.QueryType type, String param, int count, boolean exists) {
+        Map<String, AttributeValue> lastEvaluatedKey = ImmutableMap.of("666", new AttributeValue("123"));
         if (exists) {
             Set<Transaction> transactionSet = new HashSet<>();
             for (int i = 0; i < count; i++) {
@@ -137,15 +140,18 @@ public class TransactionServiceHandlerTest {
                     .thenAnswer((Answer<Map<String, AttributeValue>>) invocation -> {
                 Collection<Transaction> collection = invocation.getArgument(1);
                 collection.addAll(transactionSet);
-                return null;
+                return lastEvaluatedKey;
             });
         } else {
             when(transactionDao.load(anyString())).thenReturn(Optional.empty());
             when(transactionDao.getTransactionForPayer(anyString(), any(), any())).thenReturn(Collections.emptyMap());
         }
         TransactionProto.QueryResult result =
-                handler.handleQuery(TransactionProto.QueryRequest.newBuilder().setType(type).setParam(param).build());
+                handler.handleQuery(MY_ID, TransactionProto.QueryRequest.newBuilder().setType(type).setParam(param).build());
         assertEquals(count, result.getItemsList().size());
+        if (exists && type.equals(PAYER_ID)) {
+            assertEquals(new Gson().toJson(lastEvaluatedKey), result.getLastEvaluatedKey());
+        }
     }
 
     private static Stream<Arguments> getQueryParam() {
@@ -193,13 +199,12 @@ public class TransactionServiceHandlerTest {
     @MethodSource("getQueryIllegalArgumentParam")
     public void test_Query_IllegalArgumentException(TransactionProto.QueryRequest.QueryType type, String param) {
         assertThrows(IllegalArgumentException.class,
-                () -> handler.handleQuery(TransactionProto.QueryRequest.newBuilder().setType(type).setParam(param).build()));
+                () -> handler.handleQuery(param, TransactionProto.QueryRequest.newBuilder().setType(type).setParam(param).build()));
     }
 
     private static Stream<Arguments> getQueryIllegalArgumentParam() {
         return Stream.of(
-                Arguments.of(TRANSACTION_ID, ""),
-                Arguments.of(TransactionProto.QueryRequest.QueryType.PAYER_ID, "")
+                Arguments.of(TRANSACTION_ID, "")
         );
     }
 

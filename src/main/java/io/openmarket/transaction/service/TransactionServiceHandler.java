@@ -5,6 +5,8 @@ import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.reflect.TypeToken;
+import com.google.gson.Gson;
 import io.grpc.Context;
 import io.openmarket.config.NewAccountConfig;
 import io.openmarket.server.config.InterceptorConfig;
@@ -25,8 +27,8 @@ import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
 
 import javax.inject.Inject;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +39,7 @@ import static io.openmarket.config.TransactionConfig.TRANSACTION_INITIAL_STATUS;
 
 @Log4j2
 public class TransactionServiceHandler {
+    private static final Gson GSON = new Gson();
     private static final String INVALID_REFUND_REQUEST_ERR_MSG = "The given refund request is invalid";
     private final TransactionDao transactionDao;
     private final WalletDao walletDao;
@@ -62,21 +65,27 @@ public class TransactionServiceHandler {
         return TransactionProto.PaymentResult.newBuilder().setTransactionId(transactionId).build();
     }
 
-    public TransactionProto.QueryResult handleQuery(@NonNull final TransactionProto.QueryRequest request) {
+    public TransactionProto.QueryResult handleQuery(@NonNull final String userId,
+                                                    @NonNull final TransactionProto.QueryRequest request) {
         log.info("Handling transaction query with request: {}", request);
-        List<Transaction> matchingTransactions = Collections.emptyList();
+        List<Transaction> matchingTransactions = new ArrayList<>();
+        Map<String, AttributeValue> lastEvaluatedKey = null;
         try {
             if (request.getType().equals(TransactionProto.QueryRequest.QueryType.TRANSACTION_ID)) {
                 matchingTransactions = ImmutableList.of(getTransactionByID(request.getParam()));
             } else if (request.getType().equals(TransactionProto.QueryRequest.QueryType.PAYER_ID)) {
-                matchingTransactions = getAllTransactionsForPayer(request.getParam());
-                log.info("Found {} transactions", matchingTransactions.size());
+                lastEvaluatedKey = transactionDao.getTransactionForPayer(userId, matchingTransactions,
+                        convertToExclusiveStartKey(request.getExclusiveStartKey()));
+            } else if (request.getType().equals(TransactionProto.QueryRequest.QueryType.RECIPIENT_ID)) {
+                lastEvaluatedKey = transactionDao.getTransactionForRecipient(userId, matchingTransactions,
+                        convertToExclusiveStartKey(request.getExclusiveStartKey()));
             }
         } catch (InvalidTransactionException e) {
             log.error("InvalidTransactionException occurred with request type {}, param '{}'",
                     request.getType(), request.getParam(), e);
         }
-        return convertTransactionToQueryResult(matchingTransactions);
+        log.info("Found {} transactions", matchingTransactions.size());
+        return convertTransactionToQueryResult(matchingTransactions, lastEvaluatedKey);
     }
 
     public TransactionProto.RefundResult handleRefund(@NonNull final Context context,
@@ -188,16 +197,17 @@ public class TransactionServiceHandler {
         log.info("Created a new transaction: {}", transaction);
     }
 
-    private List<Transaction> getAllTransactionsForPayer(@NonNull final String payerId) {
-        if (payerId.isEmpty()) {
-            throw new IllegalArgumentException("payerId cannot be empty");
+    private Map<String, AttributeValue> convertToExclusiveStartKey(final String exclusiveStartKeyStr) {
+        Map<String, AttributeValue> exclusiveStartKey = null;
+        if (!exclusiveStartKeyStr.isEmpty()) {
+            try {
+                Type type = new TypeToken<Map<String, AttributeValue>>(){}.getType();
+                exclusiveStartKey = GSON.fromJson(exclusiveStartKeyStr, type);
+            } catch (Exception e) {
+                log.error("Failed to parse exclusiveStartKey {}", exclusiveStartKeyStr);
+            }
         }
-        Map<String, AttributeValue> lastEvaluatedKey = null;
-        final List<Transaction> result = new ArrayList<>();
-        do {
-            lastEvaluatedKey = transactionDao.getTransactionForPayer(payerId, result, lastEvaluatedKey);
-        } while (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty());
-        return result;
+        return exclusiveStartKey;
     }
 
     private Transaction getTransactionByID(final String transactionID) {
@@ -228,7 +238,8 @@ public class TransactionServiceHandler {
                 .build();
     }
 
-    private TransactionProto.QueryResult convertTransactionToQueryResult(final List<Transaction> transactions) {
+    private TransactionProto.QueryResult convertTransactionToQueryResult(final List<Transaction> transactions,
+                                                                         final Map<String, AttributeValue> lastEvaluatedKey) {
         return TransactionProto.QueryResult.newBuilder().addAllItems(transactions.stream().map(
                 t -> TransactionProto.QueryResultItem.newBuilder()
                 .setTransactionId(t.getTransactionId())
@@ -241,7 +252,11 @@ public class TransactionServiceHandler {
                 .setPayerId(t.getPayerId())
                 .setRecipientId(t.getRecipientId())
                 .setType(TransactionProto.QueryResultItem.Type.valueOf(t.getType().toString()))
-                .build()).collect(Collectors.toList())).build();
+                        .setError(TransactionProto.ErrorCategory.valueOf(t.getError().toString()))
+                        .setNote(t.getNote())
+                .build()).collect(Collectors.toList()))
+                .setLastEvaluatedKey(lastEvaluatedKey == null ? "xxxx" : GSON.toJson(lastEvaluatedKey))
+                .build();
     }
 
     @VisibleForTesting

@@ -66,6 +66,7 @@ dependencies {
     implementation 'com.amazonaws:aws-java-sdk-ses'
 
     implementation("com.google.guava:guava:29.0-jre")
+    implementation 'com.google.code.gson:gson:2.8.6'
 
     implementation 'com.auth0:java-jwt:3.10.3'
 

@@ -28,7 +28,8 @@ public class TransactionRPCService extends TransactionGrpc.TransactionImplBase {
     @Override
     public void processQuery(@NonNull final TransactionProto.QueryRequest request,
                                @NonNull final StreamObserver<TransactionProto.QueryResult> responseObserver) {
-        responseObserver.onNext(handler.handleQuery(request));
+        String userId = InterceptorConfig.USER_NAME_CONTEXT_KEY.get(Context.current());
+        responseObserver.onNext(handler.handleQuery(userId, request));
         responseObserver.onCompleted();
     }
 
