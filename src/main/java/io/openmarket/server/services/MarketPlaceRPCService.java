@@ -17,34 +17,34 @@ public class MarketPlaceRPCService extends MarketPlaceGrpc.MarketPlaceImplBase {
     public MarketPlaceRPCService(@Nonnull final MarketPlaceServiceHandler marketPlaceServiceHandler) {
         this.marketPlaceServiceHandler = marketPlaceServiceHandler;
     }
-
-    @Override
-    public void handleAddItems (@Nonnull final AddItemRequest request,
-                                @Nonnull final StreamObserver<AddItemResult> observer) {
-        observer.onNext(this.marketPlaceServiceHandler.addItem(request));
-        observer.onCompleted();
-    }
-
-    @Override
-    public void handleGetOrgItems (@Nonnull final GetOrgItemsRequest request,
-                                   @Nonnull final StreamObserver<GetOrgItemsResult> observer) {
-        observer.onNext(this.marketPlaceServiceHandler.getListingByOrgId(request));
-        observer.onCompleted();
-    }
-
-    @Override
-    public void handleCheckout (@Nonnull final CheckOutRequest request,
-                                @Nonnull final StreamObserver<CheckOutResult> observer) {
-        String userId = InterceptorConfig.USER_NAME_CONTEXT_KEY.get(Context.current());
-        observer.onNext(this.marketPlaceServiceHandler.checkout(userId, request));
-        observer.onCompleted();
-    }
-
-    @Override
-    public void handleGetSimilarItems (@Nonnull final GetSimilarItemsRequest request,
-                                       @Nonnull final StreamObserver<GetSimilarItemsResult> observer) {
-        observer.onNext(this.marketPlaceServiceHandler.getSimilarItem(request));
-        observer.onCompleted();
-    }
+//
+//    @Override
+//    public void handleAddItems (@Nonnull final AddItemRequest request,
+//                                @Nonnull final StreamObserver<AddItemResult> observer) {
+//        observer.onNext(this.marketPlaceServiceHandler.addItem(request));
+//        observer.onCompleted();
+//    }
+//
+//    @Override
+//    public void handleGetOrgItems (@Nonnull final GetOrgItemsRequest request,
+//                                   @Nonnull final StreamObserver<GetOrgItemsResult> observer) {
+//        observer.onNext(this.marketPlaceServiceHandler.getListingByOrgId(request));
+//        observer.onCompleted();
+//    }
+//
+//    @Override
+//    public void handleCheckout (@Nonnull final CheckOutRequest request,
+//                                @Nonnull final StreamObserver<CheckOutResult> observer) {
+//        String userId = InterceptorConfig.USER_NAME_CONTEXT_KEY.get(Context.current());
+//        observer.onNext(this.marketPlaceServiceHandler.checkout(userId, request));
+//        observer.onCompleted();
+//    }
+//
+//    @Override
+//    public void handleGetSimilarItems (@Nonnull final GetSimilarItemsRequest request,
+//                                       @Nonnull final StreamObserver<GetSimilarItemsResult> observer) {
+//        observer.onNext(this.marketPlaceServiceHandler.getSimilarItem(request));
+//        observer.onCompleted();
+//    }
 
 }

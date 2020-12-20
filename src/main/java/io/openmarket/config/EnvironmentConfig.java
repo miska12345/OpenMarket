@@ -28,4 +28,6 @@ public class EnvironmentConfig {
      * The environment variable name for how long a token is valid for (in hours).
      */
     public static final String ENV_VAR_TOKEN_DURATION = "TokenDuration";
+
+    public static final String ENV_VAR_DB_URL = "DB_URL";
 }

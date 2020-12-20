@@ -13,9 +13,13 @@ import io.openmarket.transaction.dao.dynamodb.TransactionDao;
 import io.openmarket.transaction.dao.sqs.SQSTransactionTaskPublisher;
 import io.openmarket.transaction.service.TransactionServiceHandler;
 import io.openmarket.wallet.dao.dynamodb.WalletDao;
+import org.omg.SendingContext.RunTimeOperations;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
 
 import static io.openmarket.config.EnvironmentConfig.*;
 
@@ -75,4 +79,5 @@ public class OpenMarketModule {
     int provideTokenDuration(final EnvMap env) {
         return Integer.parseInt(env.get(ENV_VAR_TOKEN_DURATION));
     }
+
 }
