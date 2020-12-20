@@ -44,4 +44,11 @@ public class StampEventRPCService extends StampEventGrpc.StampEventImplBase {
         resultStreamObserver.onNext(handler.handleGetEvent(Context.current(), request));
         resultStreamObserver.onCompleted();
     }
+
+    @Override
+    public void getOwnedEvent(@NonNull final EventProto.GetOwnedEventRequest request,
+                              @NonNull final StreamObserver<EventProto.GetOwnedEventResult> resultStreamObserver) {
+        resultStreamObserver.onNext(handler.handleGetOwnedEvent(Context.current(), request));
+        resultStreamObserver.onCompleted();
+    }
 }

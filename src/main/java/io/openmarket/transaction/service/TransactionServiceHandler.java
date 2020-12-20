@@ -71,14 +71,22 @@ public class TransactionServiceHandler {
         List<Transaction> matchingTransactions = new ArrayList<>();
         Map<String, AttributeValue> lastEvaluatedKey = null;
         try {
-            if (request.getType().equals(TransactionProto.QueryRequest.QueryType.TRANSACTION_ID)) {
-                matchingTransactions = ImmutableList.of(getTransactionByID(request.getParam()));
-            } else if (request.getType().equals(TransactionProto.QueryRequest.QueryType.PAYER_ID)) {
-                lastEvaluatedKey = transactionDao.getTransactionForPayer(userId, matchingTransactions,
+            switch (request.getType()) {
+                case TRANSACTION_ID:
+                    matchingTransactions = ImmutableList.of(getTransactionByID(request.getParam()));
+                    break;
+                case PAYER_ID:
+                    lastEvaluatedKey = transactionDao.getTransactionForPayer(userId, matchingTransactions,
+                            convertToExclusiveStartKey(request.getExclusiveStartKey()));
+                    break;
+                case RECIPIENT_ID:
+                    lastEvaluatedKey = transactionDao.getTransactionForRecipient(userId, matchingTransactions,
                         convertToExclusiveStartKey(request.getExclusiveStartKey()));
-            } else if (request.getType().equals(TransactionProto.QueryRequest.QueryType.RECIPIENT_ID)) {
-                lastEvaluatedKey = transactionDao.getTransactionForRecipient(userId, matchingTransactions,
-                        convertToExclusiveStartKey(request.getExclusiveStartKey()));
+                    break;
+                case ALL:
+                    // blablabla
+                default:
+                    log.warn("Transaction query has invalid type: {}", request.getType());
             }
         } catch (InvalidTransactionException e) {
             log.error("InvalidTransactionException occurred with request type {}, param '{}'",

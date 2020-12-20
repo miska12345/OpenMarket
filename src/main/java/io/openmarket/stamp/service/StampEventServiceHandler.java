@@ -3,7 +3,11 @@ package io.openmarket.stamp.service;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
 import io.grpc.Context;
 import io.openmarket.event.grpc.EventProto;
 import io.openmarket.event.grpc.EventProto.CreateEventRequest;
@@ -21,17 +25,24 @@ import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
 
 import javax.inject.Inject;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static io.openmarket.config.StampEventConfig.*;
 
 @Log4j2
 public class StampEventServiceHandler {
     private static final String ILLEGAL_ARGUMENTS_ERROR_MSG = "The request contains invalid parameters";
+    private static final Gson GSON = new Gson();
 
     private final StampEventDao eventDao;
     private final TransactionServiceHandler transactionServiceHandler;
+
 
     @Inject
     public StampEventServiceHandler(@NonNull final StampEventDao eventDao,
@@ -62,6 +73,34 @@ public class StampEventServiceHandler {
                                                     @NonNull final EventProto.GetEventRequest request) {
         final String userId = InterceptorConfig.USER_NAME_CONTEXT_KEY.get(context);
         return getEvent(userId, request);
+    }
+
+    public EventProto.GetOwnedEventResult handleGetOwnedEvent(@NonNull final Context context,
+                                                              @NonNull final EventProto.GetOwnedEventRequest request) {
+        final String userId = InterceptorConfig.USER_NAME_CONTEXT_KEY.get(context);
+        return getOwnedEvent(userId, request);
+    }
+
+    public EventProto.GetOwnedEventResult getOwnedEvent(String userId, EventProto.GetOwnedEventRequest request) {
+        final List<String> eventIds = new ArrayList<>();
+        final Type type = new TypeToken<Map<String, String>>(){}.getType();
+        final int count = request.getCount() > 0 ? request.getCount() : 1;
+        final List<StampEvent> loadResult;
+        Map<String, AttributeValue> exclusiveStartKey;
+        try {
+            exclusiveStartKey = GSON.fromJson(request.getExclusiveStartKey(), type);
+        } catch (JsonSyntaxException e) {
+            exclusiveStartKey = null;
+        }
+        final Map<String, AttributeValue> lastEvaluatedKey = eventDao.getEventIdsByOwner(userId, exclusiveStartKey,
+                count, eventIds);
+        loadResult = eventIds.isEmpty() ? ImmutableList.of() : eventDao.batchLoad(eventIds);
+        log.info("User {} got owned events with size {}", userId, loadResult.size());
+        return EventProto.GetOwnedEventResult.newBuilder()
+                .addAllEvents(loadResult.stream().map(this::convertToGRPCEvent).collect(Collectors.toList()))
+                .setError(EventProto.Error.NOTHING)
+                .setLastEvaluatedKey(GSON.toJson(lastEvaluatedKey))
+                .build();
     }
 
     public EventProto.GetEventResult getEvent(String userId, EventProto.GetEventRequest request) {
@@ -130,11 +169,6 @@ public class StampEventServiceHandler {
     }
 
     public CreateEventResult createEvent(@NonNull final String ownerId, @NonNull final CreateEventRequest request) {
-        final Date expirationDate = TimeUtils.parseDate(request.getExpiresAt());
-        final Date today = new Date();
-        if (expirationDate.before(today)) {
-            throw new IllegalArgumentException("Expiration date is invalid");
-        }
         if (!isCreateEventRequestValid(request)) {
             throw new IllegalArgumentException(ILLEGAL_ARGUMENTS_ERROR_MSG);
         }
@@ -142,12 +176,13 @@ public class StampEventServiceHandler {
         // TODO: Optimize
         final StampEvent event = StampEvent.builder()
                 .ownerId(ownerId)
+                .name(request.getName())
                 .type(EventOwnerType.USER)
                 .currencyId(request.getCurrency())
                 .totalAmount(request.getTotalAmount())
                 .rewardAmount(request.getRewardAmount())
                 .remainingAmount(request.getTotalAmount())
-                .expireAt(expirationDate)
+                .expireAt(TimeUtils.parseDate(request.getExpiresAt()))
                 .build();
         eventDao.save(event);
         return CreateEventResult.newBuilder().setEventId(event.getEventId()).build();
@@ -192,9 +227,10 @@ public class StampEventServiceHandler {
     private EventProto.Event convertToGRPCEvent(final StampEvent event) {
         return EventProto.Event.newBuilder()
                 .setEventId(event.getEventId())
+                .setName(event.getName())
                 .setCreatedAt(event.getCreatedAt().toString())
                 .setCurrency(event.getCurrencyId())
-                .setExpiresAt(event.getExpireAt().toString())
+                .setExpiresAt(TimeUtils.formatDate(event.getExpireAt()))
                 .setOwner(event.getOwnerId())
                 .setRemainingAmount(event.getRemainingAmount())
                 .setTotalAmount(event.getTotalAmount())
@@ -214,10 +250,16 @@ public class StampEventServiceHandler {
     }
 
     private static boolean isCreateEventRequestValid(final CreateEventRequest request) {
+        final Date expirationDate = TimeUtils.parseDate(request.getExpiresAt());
+        final Date today = new Date();
+        if (expirationDate.before(today)) {
+            throw new IllegalArgumentException("Expiration date is invalid");
+        }
         return !request.getCurrency().trim().isEmpty()
                 && request.getRewardAmount() > 0
                 && request.getTotalAmount() > 0
-                && request.getRewardAmount() <= request.getTotalAmount();
+                && request.getRewardAmount() <= request.getTotalAmount()
+                && expirationDate.after(today);
     }
 
     private static boolean isGetEventRequestValid(final EventProto.GetEventRequest request) {
