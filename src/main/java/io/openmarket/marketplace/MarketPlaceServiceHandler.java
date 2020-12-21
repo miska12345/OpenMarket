@@ -75,6 +75,7 @@ public class MarketPlaceServiceHandler {
 
         return true;
     }
+
     private ItemGrpc convertToGrpc(Item item) {
         return ItemGrpc.newBuilder()
                 .setItemName(item.getItemName()).setItemStock(item.getStock())
