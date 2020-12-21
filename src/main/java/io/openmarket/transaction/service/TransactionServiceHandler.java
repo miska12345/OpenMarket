@@ -57,7 +57,7 @@ public class TransactionServiceHandler {
         this.queueURL = queueURL;
         log.info("TransactionServiceHandler started");
     }
-
+    
     public TransactionProto.PaymentResult handlePayment(@NonNull final Context context,
                                                         @NonNull final TransactionProto.PaymentRequest request) {
         final String payerId = InterceptorConfig.USER_NAME_CONTEXT_KEY.get(context);

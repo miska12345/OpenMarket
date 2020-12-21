@@ -24,7 +24,8 @@ public class Server {
                   @NonNull final OrganizationRPCService orgSerice,
                   @NonNull final StampEventRPCService eventService,
                   @NonNull final OpenMarketInterceptor interceptor,
-                  @Nonnull final MarketPlaceRPCService marketplaceService) {
+                  @Nonnull final MarketPlaceRPCService marketplaceService,
+                  @Nonnull final NewsFeedRPCService newsfeedService) {
         this.port = port;
         this.server = ServerBuilder
                 .forPort(port)
@@ -33,6 +34,7 @@ public class Server {
                 .addService(orgSerice)
                 .addService(eventService)
                 .addService(marketplaceService)
+                .addService(newsfeedService)
                 .intercept(interceptor)
                 .build();
     }
