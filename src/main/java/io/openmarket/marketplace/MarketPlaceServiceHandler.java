@@ -27,6 +27,7 @@ public class MarketPlaceServiceHandler {
     //the checkout is aborted after checking transaction status for 20 second
     private final int CHECKOUT_TIMEOUT = 10;
     private final int CHECKOUT_QUERY_DELAY = 2000;
+
     @Inject
     public MarketPlaceServiceHandler(@Nonnull final ItemDao itemDao,
                                      @Nonnull final TransactionServiceHandler transactionServiceHandler) {
@@ -37,7 +38,7 @@ public class MarketPlaceServiceHandler {
     public GetOrgItemsResult getListingByOrgId(GetOrgItemsRequest request) throws SQLException {
         List<Integer> itemIds = this.itemDao.getItemIdsByOrg(request.getOrgId());
         List<Item> selling = this.itemDao.batchLoad(itemIds);
-        List<ItemGrpc> result = new ArrayList<>();
+        List<MarketPlaceItem> result = new ArrayList<>();
 
         for(Item item : selling) {
             result.add(convertToGrpc(item));
@@ -66,18 +67,18 @@ public class MarketPlaceServiceHandler {
 //                .setItemName(item.getItemName()).setAddStatus(AddItemResult.Status.SUCCESS).build();
 //    }
 
-    private boolean validateItemGrpc(ItemGrpc target) {
-        if (target.getItemCount() < 1 || target.getItemName().isEmpty() || target.getCategory().isEmpty()
-        || target.getItemCount() < 1 || target.getItemPrice() < 0 || target.getBelongTo().isEmpty()
-        || target.getItemImageLink().isEmpty() || target.getItemStock() < 1){
+    private boolean validateItemGrpc(MarketPlaceItem target) {
+        if (target.getItemName().isEmpty() || target.getCategory().isEmpty()
+            || target.getItemPrice() < 0 || target.getBelongTo().isEmpty()
+            || target.getItemImageLink().isEmpty() || target.getItemStock() < 1){
             return false;
         }
 
         return true;
     }
 
-    private ItemGrpc convertToGrpc(Item item) {
-        return ItemGrpc.newBuilder()
+    private MarketPlaceItem convertToGrpc(Item item) {
+        return MarketPlaceItem.newBuilder()
                 .setItemName(item.getItemName()).setItemStock(item.getStock())
                 .setBelongTo(item.getBelongTo())
                 .setItemPrice(item.getItemPrice())
@@ -174,7 +175,7 @@ public class MarketPlaceServiceHandler {
 //        }
 //        return false;
 //    }
-//
+
 //    private CheckOutResult updateItemDB(List<ItemGrpc> items, Set<ItemGrpc> unprocessed) {
 //        CheckOutResult.Builder response = CheckOutResult.newBuilder();
 //
