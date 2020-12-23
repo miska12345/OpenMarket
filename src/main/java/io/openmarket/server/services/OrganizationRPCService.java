@@ -30,7 +30,7 @@ public class OrganizationRPCService extends OrganizationGrpc.OrganizationImplBas
 
     @Override
     public void updateOrganization(OrganizationOuterClass.orgMetadata request,
-                                io.grpc.stub.StreamObserver<OrganizationOuterClass.orgName> responseObserver) {
+                                io.grpc.stub.StreamObserver<OrganizationOuterClass.OrgUpdateResult> responseObserver) {
         responseObserver.onNext(handler.partialUpdateRequest(request));
         responseObserver.onCompleted();
     }

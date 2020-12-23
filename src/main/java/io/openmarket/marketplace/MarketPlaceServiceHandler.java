@@ -35,17 +35,17 @@ public class MarketPlaceServiceHandler {
         this.transactionServiceHandler = transactionServiceHandler;
     }
 
-    public GetOrgItemsResult getListingByOrgId(GetOrgItemsRequest request) throws SQLException {
-        List<Integer> itemIds = this.itemDao.getItemIdsByOrg(request.getOrgId());
-        List<Item> selling = this.itemDao.batchLoad(itemIds);
-        List<MarketPlaceItem> result = new ArrayList<>();
-
-        for(Item item : selling) {
-            result.add(convertToGrpc(item));
-        }
-
-        return GetOrgItemsResult.newBuilder().addAllItems(result).build();
-    }
+//    public GetOrgItemsResult getListingByOrgId(GetOrgItemsRequest request) throws SQLException {
+//        List<Integer> itemIds = this.itemDao.getItemIdsByOrg(request.getOrgId());
+//        List<Item> selling = this.itemDao.batchLoad(itemIds);
+//        List<MarketPlaceItem> result = new ArrayList<>();
+//
+//        for(Item item : selling) {
+//            result.add(convertToGrpc(item));
+//        }
+//
+//        return GetOrgItemsResult.newBuilder().addAllItems(result).build();
+//    }
 
 //    public AddItemResult addItem(AddItemRequest request) {
 //        ItemGrpc item = request.getItem();
@@ -77,17 +77,17 @@ public class MarketPlaceServiceHandler {
         return true;
     }
 
-    private MarketPlaceItem convertToGrpc(Item item) {
-        return MarketPlaceItem.newBuilder()
-                .setItemName(item.getItemName()).setItemStock(item.getStock())
-                .setBelongTo(item.getBelongTo())
-                .setItemPrice(item.getItemPrice())
-                .setItemDescription(item.getItemDescription())
-                .setItemId(item.getItemID())
-                .setCategory(item.getItemCategory())
-                .setItemImageLink(item.getItemImageLink())
-                .build();
-    }
+//    private MarketPlaceItem convertToGrpc(Item item) {
+//        return MarketPlaceItem.newBuilder()
+//                .setItemName(item.getItemName()).setItemStock(item.getStock())
+//                .setBelongTo(item.getBelongTo())
+//                .setItemPrice(item.getItemPrice())
+//                .setItemDescription(item.getItemDescription())
+//                .setItemId(item.getItemID())
+//                .setCategory(item.getItemCategory())
+//                .setItemImageLink(item.getItemImageLink())
+//                .build();
+//    }
 
 //    public GetSimilarItemsResult getSimilarItem(GetSimilarItemsRequest request) {
 //        if (request.getItemIds().isEmpty() || request.getItemCategory().isEmpty())

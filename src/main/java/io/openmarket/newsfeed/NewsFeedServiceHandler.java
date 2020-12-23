@@ -35,7 +35,7 @@ public class NewsFeedServiceHandler {
                 .setBelongTo(item.getBelongTo())
                 .setItemPrice(item.getItemPrice())
                 .setItemDescription(item.getItemDescription())
-                .setItemId(item.getItemID())
+//                .setItemId(item.getItemID())
                 .setCategory(item.getItemCategory())
                 .setItemImageLink(item.getItemImageLink())
                 .setPurchasedCount(item.getPurchasedCount())

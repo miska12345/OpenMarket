@@ -5,6 +5,7 @@ import io.openmarket.dagger.module.EnvMap;
 import io.openmarket.dagger.module.OpenMarketModule;
 import io.openmarket.marketplace.MarketPlaceServiceHandler;
 import io.openmarket.newsfeed.NewsFeedServiceHandler;
+import io.openmarket.organization.OrgServiceHandler;
 import io.openmarket.server.OpenMarketInterceptor;
 import io.openmarket.server.Server;
 import io.openmarket.server.services.AccountRPCService;
@@ -20,7 +21,7 @@ import javax.inject.Singleton;
 public interface OpenMarketComponent {
     TransactionRPCService buildTransacService();
     AccountRPCService buildAccountService();
-    OrganizationRPCService buildOrgService();
+    OrgServiceHandler buildOrgService();
     StampEventServiceHandler buildStampEventService();
     MarketPlaceServiceHandler buildMarketPlaceService();
     NewsFeedServiceHandler buildNewsFeedService();

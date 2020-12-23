@@ -10,9 +10,18 @@ import com.google.common.collect.ImmutableSet;
 import io.openmarket.organization.OrgServiceHandler;
 import io.openmarket.organization.dao.OrgDaoImpl;
 import io.openmarket.organization.grpc.OrganizationOuterClass;
+import io.openmarket.organization.grpc.OrganizationOuterClass.*;
 import io.openmarket.organization.model.Organization;
+import org.checkerframework.dataflow.qual.TerminatesExecution;
 import org.junit.jupiter.api.*;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static io.openmarket.config.OrgConfig.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -23,6 +32,24 @@ public class OrgServiceHandlerTest {
     private DynamoDBMapper dbMapper;
     private OrgDaoImpl orgDao;
     private OrgServiceHandler serviceHandler;
+
+    public final Organization TEST_ORG = Organization.builder()
+            .orgCurrency("HELLO")
+            .orgDescription("test")
+            .orgName("testOrg")
+            .orgOwnerId("owner1")
+            .orgPosterS3Key("FABAB")
+            .orgPortraitS3Key("ldksjfasdo")
+            .build();
+
+    OrganizationOuterClass.orgMetadata TEST_REQUEST = OrganizationOuterClass.orgMetadata.newBuilder()
+            .setOrgCurrency("HELLO")
+            .setOrgDescription("test")
+            .setOrgName("testOrg")
+            .setOrgOwnerId("owner1")
+            .setOrgPortraitS3Key("ldksjfasdo")
+            .setOrgPosterS3Key("FABAB")
+            .build();
 
     private static void createTable() {
         dbClient.createTable(new CreateTableRequest().withTableName(ORG_DDB_TABLE_NAME)
@@ -47,39 +74,23 @@ public class OrgServiceHandlerTest {
 
     @Test
     public void when_SaveOrg_then_Exists_In_DB() {
-        Organization org = Organization.builder()
-                .orgCurrency("HELLO")
-                .orgDescription("test")
-                .orgName("testOrg")
-                .orgOwnerId("owner1")
-                .orgPortraitS3Key("ldksjfasdo")
-                .build();
-        serviceHandler.addOrg(org);
+        serviceHandler.addOrg(this.TEST_ORG);
         ScanResult result = dbClient.scan(new ScanRequest().withTableName(ORG_DDB_TABLE_NAME));
         assertEquals(1, result.getItems().size());
     }
 
     @Test
     public void saveOrgRequest_then_getOrg_by_name() {
-        OrganizationOuterClass.orgMetadata req = OrganizationOuterClass.orgMetadata.newBuilder()
-                .setOrgCurrency("HELLO")
-                .setOrgDescription("test")
-                .setOrgName("testOrg")
-                .setOrgOwnerId("owner1")
-                .setOrgPortraitS3Key("ldksjfasdo")
-                .setOrgSlogan("hello world")
-                .build();
-        serviceHandler.addOrgRquest(req);
+        serviceHandler.addOrgRquest(this.TEST_REQUEST);
 
         ScanResult result = dbClient.scan(new ScanRequest().withTableName(ORG_DDB_TABLE_NAME));
         assertEquals(1, result.getItems().size());
         Organization org = serviceHandler.getOrg("testOrg").get();
-        assertEquals(req.getOrgName(), org.getOrgName());
-        assertTrue(req.getOrgCurrency().equals(org.getOrgCurrency()));
-        assertEquals(req.getOrgPortraitS3Key(), org.getOrgPortraitS3Key());
-        assertEquals(req.getOrgOwnerId(), org.getOrgOwnerId());
-        assertEquals(req.getOrgDescription(), org.getOrgDescription());
-
+        assertEquals(TEST_REQUEST.getOrgName(), org.getOrgName());
+        assertTrue(TEST_REQUEST.getOrgCurrency().equals(org.getOrgCurrency()));
+        assertEquals(TEST_REQUEST.getOrgPortraitS3Key(), org.getOrgPortraitS3Key());
+        assertEquals(TEST_REQUEST.getOrgOwnerId(), org.getOrgOwnerId());
+        assertEquals(TEST_REQUEST.getOrgDescription(), org.getOrgDescription());
     }
 
     @Test
@@ -89,6 +100,7 @@ public class OrgServiceHandlerTest {
                 .orgDescription("test")
                 .orgName("testOrg")
                 .orgOwnerId("owner1")
+                .orgPosterS3Key("FABAB")
                 .orgPortraitS3Key("ldksjfasdo")
                 .build();
         serviceHandler.addOrg(org);
@@ -110,6 +122,7 @@ public class OrgServiceHandlerTest {
                 .orgName("testOrg")
                 .orgOwnerId("owner1")
                 .orgPortraitS3Key("ldksjfasdo")
+                .orgPosterS3Key("FABAB")
                 .build();
         serviceHandler.addOrg(org);
         System.out.println(org);
@@ -133,42 +146,111 @@ public class OrgServiceHandlerTest {
                 .orgName("testOrg")
                 .orgOwnerId("owner1")
                 .orgPortraitS3Key("ldksjfasdo")
+                .orgPosterS3Key("FABAB")
                 .build();
         serviceHandler.addOrg(org);
 
         assertThrows(IllegalArgumentException.class, ()->{serviceHandler.addOrg(org);});
     }
 
+    @Test
+    public void can_update_followers_if_new() {
+        this.serviceHandler.addOrgRquest(TEST_REQUEST);
 
-//    @Test
-//    public void partial_update_org(){
-//
-//        Organization org = Organization.builder()
-//                .orgCurrency("HELLO")
-//                .orgDescription("test")
-//                .orgName("testOrg")
-//                .orgOwnerId("owner1")
-//                .orgPortraitS3Key("ldksjfasdo")
-//                .build();
-//        serviceHandler.addOrg(org);
-//
-//        OrganizationOuterClass.orgMetadata request = OrganizationOuterClass.orgMetadata.newBuilder()
-//                .setOrgDescription("Description")
-//                .setOrgName("testOrg")
-//                .setOrgPortraitS3Key("key")
-//                .setOrgOwnerId("owner1").build();
-//        serviceHandler.partialUpdateRequest(request);
-//
-//        Optional<Organization> opOrg = serviceHandler.getOrg("testOrg");
-//        assertTrue(opOrg.isPresent());
-//        Organization testOrg = opOrg.get();
-//        assertEquals(testOrg.getOrgName(), "testOrg");
-//        assertTrue(testOrg.getOrgCurrency().equals(org.getOrgCurrency()));
-//        assertEquals(testOrg.getOrgPortraitS3Key(), "key");
-//        assertEquals(testOrg.getOrgOwnerId(), org.getOrgOwnerId());
-//        assertEquals(testOrg.getOrgDescription(), "Description");
-//
-//    }
+        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard").build());
+
+        Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
+
+        assertEquals(1, updated.getOrgFollowerCount());
+        assertEquals("lookchard", this.serviceHandler.getFollowerIds(TEST_REQUEST.getOrgName()).get(0));
+
+    }
+
+    @Test
+    public void can_update_followers_if_not_contains() {
+        this.serviceHandler.addOrgRquest(TEST_REQUEST);
+
+        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard").build());
+        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard2").build());
+
+        Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
+
+        assertEquals(2, updated.getOrgFollowerCount());
+
+    }
+
+    @Test
+    public void cannot_update_followers_if_contains() {
+        this.serviceHandler.addOrgRquest(TEST_REQUEST);
+
+        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard").build());
+        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard").build());
+
+        Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
+        assertEquals(1, updated.getOrgFollowerCount());
+
+    }
+
+    @Test
+    public void update_follower_insanity_check() throws InterruptedException {
+        this.serviceHandler.addOrgRquest(TEST_REQUEST);
+        List<Callable<String>> tasks = new ArrayList<>();
+        ExecutorService executor = Executors.newFixedThreadPool(10);
+        for (int i = 0; i < 10; i++) {
+            int finalI = i;
+            Callable<String> task = () -> {
+                UpdateFollowerRequest request = UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard" + finalI).build();
+                this.serviceHandler.updateFollower(request);
+                return "";
+            };
+            tasks.add(task);
+        }
+
+        executor.invokeAll(tasks);
+
+        Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
+        assertEquals(10, updated.getOrgFollowerCount());
+    }
+
+
+
+    @Test
+    public void partial_update_org(){
+        serviceHandler.addOrg(TEST_ORG);
+
+        OrganizationOuterClass.orgMetadata request = OrganizationOuterClass.orgMetadata.newBuilder()
+                .setOrgDescription("Description")
+                .setOrgName("testOrg")
+                .setOrgPortraitS3Key("key")
+                .setOrgPosterS3Key("FABA")
+                .setOrgOwnerId("owner1").build();
+        serviceHandler.partialUpdateRequest(request);
+
+        Optional<Organization> opOrg = serviceHandler.getOrg("testOrg");
+        assertTrue(opOrg.isPresent());
+        Organization testOrg = opOrg.get();
+        assertEquals(testOrg.getOrgName(), "testOrg");
+        assertTrue(testOrg.getOrgCurrency().equals(TEST_ORG.getOrgCurrency()));
+        assertEquals(testOrg.getOrgPortraitS3Key(), "key");
+        assertEquals(testOrg.getOrgPosterS3Key(), "FABA");
+        assertEquals(testOrg.getOrgOwnerId(), TEST_ORG.getOrgOwnerId());
+        assertEquals(testOrg.getOrgDescription(), "Description");
+
+
+    }
+
+    @Test
+    public void cannotUpdate_without_orgName(){
+        serviceHandler.addOrg(TEST_ORG);
+
+        OrganizationOuterClass.orgMetadata request = OrganizationOuterClass.orgMetadata.newBuilder()
+                .setOrgDescription("Description")
+                .setOrgPortraitS3Key("key")
+                .setOrgPosterS3Key("FABA")
+                .setOrgOwnerId("owner1").build();
+
+        assertThrows(IllegalArgumentException.class, ()->this.serviceHandler.partialUpdateRequest(request));
+    }
 
     @AfterAll
     public static void teardown() {
