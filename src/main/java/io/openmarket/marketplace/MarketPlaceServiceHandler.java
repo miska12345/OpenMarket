@@ -65,53 +65,79 @@ public class MarketPlaceServiceHandler {
     public MarketPlaceProto.CheckOutResult checkout(@NonNull final String userId,
                                                     @NonNull final MarketPlaceProto.CheckOutRequest request) {
         log.info("User {} requested checkout with request: {}", userId, request);
+
+        // TODO: Modify error type
+        if (!isCheckOutRequestValid(request)) {
+            log.error("User {} check out with invalid request {}", userId, request);
+            return MarketPlaceProto.CheckOutResult.newBuilder()
+                    .setError(MarketPlaceProto.Error.INTERNAL_SERVICE_ERROR)
+                    .build();
+        }
+
         final List<MarketPlaceProto.Order> successOrders = new ArrayList<>();
         final Map<Integer, MarketPlaceProto.FailedCheckOutCause> failedItems = new HashMap<>();
         final List<Integer> batchFailedItemIds = new ArrayList<>();
-        List<Item> itemsList;
-        itemsList = itemDao.batchLoad(request.getItemsMap().keySet(), batchFailedItemIds);
-        itemsList = splitOutOfStockItems(itemsList, failedItems, request.getItemsMap());
-        addAllInvalidItems(batchFailedItemIds, failedItems);
-        final Map<String, List<Item>> orgIdToItemsMap = mapOrgIdToItems(itemsList);
-        for (String orgId : orgIdToItemsMap.keySet()) {
-            // Process each organization's order separately, in a batch
-            TransactionServiceHandler.Stepper stepper = null;
-            try {
-                final Organization organization = orgServiceHandler.getOrg(orgId).orElseThrow(
-                        () -> new IllegalArgumentException(String.format("OrgId %s is invalid", orgId)));
-                final Order order = generateOrderFromCheckOutItems(userId, organization, orgIdToItemsMap.get(orgId),
-                        request.getItemsMap());
-                stepper = transactionServiceHandler.createPaymentStepper(userId,
-                        TransactionProto.PaymentRequest.newBuilder()
-                        .setType(TransactionProto.PaymentRequest.Type.PAY)
-                        .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder()
-                                .setCurrencyId(order.getCurrency())
-                                .setAmount(order.getTotal())
-                                .build())
-                        .setRecipientId(organization.getOrgName())
-                        .setNote(String.format("Order %s", order.getOrderId()))
-                        .build());
-                log.debug("Generated transaction stepper with transactionId {}", stepper.getTransaction().getTransactionId());
-                order.setTransactionId(stepper.getTransaction().getTransactionId());
-                log.info("Order generated: {}", order);
-                orderDao.save(order);
-                stepper.commit();
-                successOrders.add(convertOrderModelToGrpcOrder(order));
-            } catch (Exception e) {
-                if (stepper != null) {
-                    stepper.abort();
+        try {
+            // Fetch all items in a batch, then filter out the out of stock ones.
+            List<Item> itemsList = itemDao.batchLoad(request.getItemsMap().keySet(), batchFailedItemIds);
+            itemsList = splitOutOfStockItems(itemsList, failedItems, request.getItemsMap());
+            addAllInvalidItems(batchFailedItemIds, failedItems);
+
+            // A map of orgId to list of items sold by the particular org.
+            final Map<String, List<Item>> orgIdToItemsMap = mapOrgIdToItems(itemsList);
+
+            // Process each organization's order separately in a batch.
+            for (String orgId : orgIdToItemsMap.keySet()) {
+                TransactionServiceHandler.Stepper stepper = null;
+                try {
+                    final Organization organization = orgServiceHandler.getOrg(orgId).orElseThrow(
+                            () -> new IllegalArgumentException(String.format("OrgId %s is invalid", orgId)));
+                    final Order order = generateOrderFromCheckOutItems(userId, organization, orgIdToItemsMap.get(orgId),
+                            request.getItemsMap());
+                    stepper = transactionServiceHandler.createPaymentStepper(userId,
+                            TransactionProto.PaymentRequest.newBuilder()
+                                    .setType(TransactionProto.PaymentRequest.Type.PAY)
+                                    .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder()
+                                            .setCurrencyId(order.getCurrency())
+                                            .setAmount(order.getTotal())
+                                            .build())
+                                    .setRecipientId(organization.getOrgName())
+                                    .setNote(String.format("Order %s", order.getOrderId()))
+                                    .build());
+                    log.debug("Generated transaction stepper with transactionId {}", stepper.getTransaction().getTransactionId());
+                    order.setTransactionId(stepper.getTransaction().getTransactionId());
+                    log.info("New order generated: {}", order);
+                    orderDao.save(order);
+                    stepper.commit();
+                    successOrders.add(convertOrderModelToGrpcOrder(order));
+                } catch (IllegalArgumentException e) {
+                    orgIdToItemsMap.get(orgId).forEach(x -> failedItems.put(x.getItemID(),
+                            MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST));
+                    log.error("User {} requested check out invalid item with orgId {}, request: {}", userId,
+                            orgId, request);
+                } finally {
+                    if (stepper != null) {
+                        stepper.abort();
+                    }
                 }
-                orgIdToItemsMap.get(orgId).forEach(a -> failedItems.put(a.getItemID(),
-                        MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST));
-                log.error("Exception occurred while checking out user {} with request: {}", userId, request, e);
             }
+            log.info("Finished processing checkout for user {}, success: {}, failed: {}", userId,
+                    successOrders.size(), failedItems.size());
+            return MarketPlaceProto.CheckOutResult.newBuilder()
+                    .setError(MarketPlaceProto.Error.NONE)
+                    .addAllSuccessOrders(successOrders)
+                    .putAllFailedItems(failedItems)
+                    .build();
+        } catch (IllegalStateException e) {
+            log.error("User {} triggered internal service error with request {}", userId, request);
+            return MarketPlaceProto.CheckOutResult.newBuilder()
+                    .setError(MarketPlaceProto.Error.INTERNAL_SERVICE_ERROR)
+                    .build();
         }
-        log.info("Finished processing checkout for user {}, success: {}, failed: {}", userId,
-                successOrders.size(), failedItems.size());
-        return MarketPlaceProto.CheckOutResult.newBuilder()
-                .addAllSuccessOrders(successOrders)
-                .putAllFailedItems(failedItems)
-                .build();
+    }
+
+    private static boolean isCheckOutRequestValid(MarketPlaceProto.CheckOutRequest request) {
+        return request.getItemsMap() != null;
     }
 
     private static void addAllInvalidItems(@NonNull final Collection<Integer> failedItemIds, @NonNull final Map<Integer,
@@ -133,8 +159,10 @@ public class MarketPlaceServiceHandler {
         return validItems;
     }
 
-    private static Order generateOrderFromCheckOutItems(String userId, Organization organization, Collection<Item> items,
-                                                        Map<Integer, Integer> orderItems) {
+    private static Order generateOrderFromCheckOutItems(@NonNull final String userId,
+                                                        @NonNull final Organization organization,
+                                                        @NonNull final Collection<Item> items,
+                                                        @NonNull final Map<Integer, Integer> orderItems) {
         final String currentDate = TimeUtils.formatDate(new Date());
         final double totalCost = calculateTotalCost(items, orderItems);
 //        if (totalCost < 0) {

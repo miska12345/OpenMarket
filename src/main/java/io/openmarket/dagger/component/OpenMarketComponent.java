@@ -8,7 +8,6 @@ import io.openmarket.newsfeed.NewsFeedServiceHandler;
 import io.openmarket.server.OpenMarketInterceptor;
 import io.openmarket.server.Server;
 import io.openmarket.server.services.AccountRPCService;
-import io.openmarket.server.services.NewsFeedRPCService;
 import io.openmarket.server.services.OrganizationRPCService;
 import io.openmarket.server.services.TransactionRPCService;
 import io.openmarket.stamp.service.StampEventServiceHandler;

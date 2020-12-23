@@ -8,6 +8,7 @@ import io.openmarket.marketplace.grpc.MarketPlaceProto;
 import io.openmarket.marketplace.model.Item;
 import io.openmarket.order.dao.OrderDao;
 import io.openmarket.order.model.ItemInfo;
+import io.openmarket.order.model.Order;
 import io.openmarket.organization.OrgServiceHandler;
 import io.openmarket.organization.model.Organization;
 import io.openmarket.transaction.grpc.TransactionProto;
@@ -111,12 +112,11 @@ public class MarketPlaceHandlerTest {
         .build());
 
         verify(mockStepper, times(1)).commit();
-        verify(orderDao, times(1)).save(argThat(a -> {
-            return a.getItems().size() == 1 && isItemInfoMatchItem(a.getItems().get(0), ORG_A_ITEM_IN_STOCK);
-        }));
-        assertOrderDBEntry(1, calculateCartTotalCost(cart));
+        verify(orderDao, times(1)).save(argThat(a -> isOrderDbEntryCorrect(a, cart)));
+        assertOrderPaymentIsOkay(calculateCartTotalCost(cart));
         assertResultCountMatches(1, 0, result);
-        assertOrderContainsItem(result.getSuccessOrdersList(), items);
+        assertOrderResultContainsItem(result.getSuccessOrdersList(), items);
+        assertEquals(MarketPlaceProto.Error.NONE, result.getError());
     }
 
     @Test
@@ -133,10 +133,11 @@ public class MarketPlaceHandlerTest {
         assertResultCountMatches(0, 1, result);
         assertEquals(MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK,
                 result.getFailedItemsMap().get(ORG_A_ITEM_OUT_OF_STOCK.getItemID()));
+        assertEquals(MarketPlaceProto.Error.NONE, result.getError());
     }
 
     @Test
-    public void test_CheckOut_Multiple_Items_Success() {
+    public void test_CheckOut_Multiple_Items_Same_Org_Success() {
         List<Item> items = ImmutableList.of(ORG_A_ITEM_IN_STOCK, ORG_A_ITEM_IN_STOCK_2);
         Map<Integer, Integer> cart = ImmutableMap.of(ORG_A_ITEM_IN_STOCK.getItemID(),
                 1, ORG_A_ITEM_IN_STOCK_2.getItemID(), 1);
@@ -149,9 +150,10 @@ public class MarketPlaceHandlerTest {
                         .build());
 
         verify(mockStepper, times(1)).commit();
+        assertOrderPaymentIsOkay(calculateCartTotalCost(cart));
         assertResultCountMatches(1, 0, result);
-        assertOrderDBEntry(cart.size(), calculateCartTotalCost(cart));
-        assertOrderContainsItem(result.getSuccessOrdersList(), items);
+        assertOrderResultContainsItem(result.getSuccessOrdersList(), items);
+        assertEquals(MarketPlaceProto.Error.NONE, result.getError());
     }
 
     @Test
@@ -167,8 +169,11 @@ public class MarketPlaceHandlerTest {
                         .putAllItems(cart)
                         .build());
         verify(mockStepper, times(0)).commit();
-        assertNoOrderDbEntry();
+        verify(orderDao, times(0)).save(any());
         assertResultCountMatches(0, 1, result);
+        assertEquals(MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST,
+                result.getFailedItemsMap().get(INVALID_ITEM.getItemID()));
+        assertEquals(MarketPlaceProto.Error.NONE, result.getError());
     }
 
     @Test
@@ -187,10 +192,11 @@ public class MarketPlaceHandlerTest {
                         .putAllItems(cart)
                         .build());
         verify(mockStepper, times(0)).commit();
-        assertNoOrderDbEntry();
+        verify(orderDao, times(0)).save(any());
         assertResultCountMatches(0, 1, result);
         assertEquals(MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST,
                 result.getFailedItemsMap().get(INVALID_ITEM_2.getItemID()));
+        assertEquals(MarketPlaceProto.Error.NONE, result.getError());
     }
 
     @Test
@@ -206,10 +212,14 @@ public class MarketPlaceHandlerTest {
                         .putAllItems(cart)
                         .build());
         verify(mockStepper, times(1)).commit();
-        assertOrderDBEntry(2, ORG_A_ITEM_IN_STOCK.getItemPrice() + ORG_A_ITEM_IN_STOCK_2.getItemPrice());
+        verify(orderDao, times(1))
+                .save(argThat(a -> isOrderDbEntryCorrect(a, ImmutableMap.of(ORG_A_ITEM_IN_STOCK.getItemID(), 1,
+                ORG_A_ITEM_IN_STOCK_2.getItemID(), 1))));
+        assertOrderPaymentIsOkay(ORG_A_ITEM_IN_STOCK.getItemPrice() + ORG_A_ITEM_IN_STOCK_2.getItemPrice());
         assertResultCountMatches(1, 1, result);
         assertEquals(MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK,
                 result.getFailedItemsMap().get(ORG_A_ITEM_OUT_OF_STOCK.getItemID()));
+        assertEquals(MarketPlaceProto.Error.NONE, result.getError());
     }
 
     @Test
@@ -226,9 +236,9 @@ public class MarketPlaceHandlerTest {
                         .putAllItems(cart)
                         .build());
         verify(mockStepper, times(2)).commit();
-        verify(mockStepper, times(2)).commit();
         assertResultCountMatches(2, 0, result);
         verify(orderDao, times(2)).save(any());
+        assertEquals(MarketPlaceProto.Error.NONE, result.getError());
     }
 
     @Test
@@ -249,13 +259,44 @@ public class MarketPlaceHandlerTest {
         verify(mockStepper, times(2)).commit();
         verify(orderDao, times(2)).save(any());
         assertResultCountMatches(2, 2, result);
+        for (int failedItemId : result.getFailedItemsMap().keySet()) {
+            if (failedItemId == ORG_A_ITEM_OUT_OF_STOCK.getItemID()) {
+                assertEquals(MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK, result.getFailedItemsMap().get(failedItemId));
+            } else if (failedItemId == INVALID_ITEM.getItemID()) {
+                assertEquals(MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST, result.getFailedItemsMap().get(failedItemId));
+            }
+        }
+        assertEquals(MarketPlaceProto.Error.NONE, result.getError());
     }
 
-    private void assertNoOrderDbEntry() {
+    @Test
+    public void test_Internal_Service_Error() {
+        Map<Integer, Integer> cart = ImmutableMap.of(ORG_A_ITEM_IN_STOCK.getItemID(), 1);
+        doThrow(IllegalStateException.class).when(itemDao).batchLoad(any(), anyCollection());
+        MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
+                .checkout(BUYER_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
+                        .putAllItems(cart)
+                        .build());
+        verify(mockStepper, times(0)).commit();
         verify(orderDao, times(0)).save(any());
+        assertEquals(MarketPlaceProto.Error.INTERNAL_SERVICE_ERROR, result.getError());
     }
 
-    private void assertOrderContainsItem(List<MarketPlaceProto.Order> successOrders, List<Item> itemsSold) {
+    // Return false if the list of itemInfo doesn't match that of the cart.
+    private boolean isOrderDbEntryCorrect(Order order, Map<Integer, Integer> cart) {
+        assertEquals(cart.size(), order.getItems().size());
+        for (ItemInfo itemInfo : order.getItems()) {
+            if (!cart.containsKey(itemInfo.getItemId())
+                    || itemInfo.getQuantity() != cart.get(itemInfo.getItemId())
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void assertOrderResultContainsItem(List<MarketPlaceProto.Order> successOrders, List<Item> itemsSold) {
         List<Integer> itemIds = itemsSold.stream().map(Item::getItemID).collect(Collectors.toList());
         for (MarketPlaceProto.Order order : successOrders) {
             for (MarketPlaceProto.OrderedItem info : order.getItemsList()) {
@@ -264,13 +305,10 @@ public class MarketPlaceHandlerTest {
         }
     }
 
-    private void assertOrderDBEntry(int numItems, double total) {
-        verify(orderDao, times(1)).save(argThat(a -> {
-            return a.getItems().size() == numItems
-                    && a.getTransactionId() != null
-                    && a.getStatus().equals(PENDING_PAYMENT)
-                    && a.getTotal() == total;
-        }));
+    private void assertOrderPaymentIsOkay(double total) {
+        verify(orderDao, times(1)).save(argThat(a -> a.getTransactionId() != null
+                && a.getStatus().equals(PENDING_PAYMENT)
+                && a.getTotal() == total));
     }
 
     private static void assertResultCountMatches(int numSuccess, int numFailed, MarketPlaceProto.CheckOutResult result) {
@@ -298,10 +336,6 @@ public class MarketPlaceHandlerTest {
             total += cart.get(itemId) * ITEM_ID_TO_PRICE_MAP.get(itemId);
         }
         return total;
-    }
-
-    private static boolean isItemInfoMatchItem(ItemInfo itemInfo, Item item) {
-        return itemInfo.getItemId() == item.getItemID() && itemInfo.getItemName().equals(item.getItemName());
     }
 
     private static Transaction generateTransaction(String transactionId, String currency, double amount) {
