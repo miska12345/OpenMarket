@@ -1,43 +1,58 @@
 package io.openmarket.marketplace;
 
-import com.amazonaws.services.dynamodbv2.model.AttributeValue;
-import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
-import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
-import com.google.common.collect.ImmutableMap;
 import io.openmarket.marketplace.dao.ItemDao;
-import io.openmarket.marketplace.grpc.MarketPlaceProto.*;
+import io.openmarket.marketplace.grpc.MarketPlaceProto;
+import io.openmarket.marketplace.grpc.MarketPlaceProto.GetOrgItemsRequest;
+import io.openmarket.marketplace.grpc.MarketPlaceProto.GetOrgItemsResult;
+import io.openmarket.marketplace.grpc.MarketPlaceProto.MarketPlaceItem;
 import io.openmarket.marketplace.model.Item;
+import io.openmarket.order.dao.OrderDao;
+import io.openmarket.order.model.ItemInfo;
+import io.openmarket.order.model.Order;
+import io.openmarket.order.model.OrderStatus;
+import io.openmarket.organization.OrgServiceHandler;
+import io.openmarket.organization.model.Organization;
 import io.openmarket.transaction.grpc.TransactionProto;
-import io.openmarket.transaction.model.TransactionStatus;
 import io.openmarket.transaction.service.TransactionServiceHandler;
+import io.openmarket.utils.TimeUtils;
+import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import java.sql.SQLException;
-import java.util.*;
-
-import static io.openmarket.config.MerchandiseConfig.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Log4j2
 public class MarketPlaceServiceHandler {
     private final ItemDao itemDao;
+    private final OrderDao orderDao;
+    private final OrgServiceHandler orgServiceHandler;
     private final TransactionServiceHandler transactionServiceHandler;
-
-    //the checkout is aborted after checking transaction status for 20 second
-    private final int CHECKOUT_TIMEOUT = 10;
-    private final int CHECKOUT_QUERY_DELAY = 2000;
 
     @Inject
     public MarketPlaceServiceHandler(@Nonnull final ItemDao itemDao,
+                                     @NonNull final OrderDao orderDao,
+                                     @NonNull final OrgServiceHandler orgServiceHandler,
                                      @Nonnull final TransactionServiceHandler transactionServiceHandler) {
         this.itemDao = itemDao;
+        this.orderDao = orderDao;
+        this.orgServiceHandler = orgServiceHandler;
         this.transactionServiceHandler = transactionServiceHandler;
+        log.info("MarketPlaceServiceHandler started");
     }
 
     public GetOrgItemsResult getListingByOrgId(GetOrgItemsRequest request) throws SQLException {
         List<Integer> itemIds = this.itemDao.getItemIdsByOrg(request.getOrgId());
-        List<Item> selling = this.itemDao.batchLoad(itemIds);
+        List<Integer> failedItemIds = new ArrayList<>();
+        List<Item> selling = this.itemDao.batchLoad(itemIds, failedItemIds);
         List<MarketPlaceItem> result = new ArrayList<>();
 
         for(Item item : selling) {
@@ -45,6 +60,147 @@ public class MarketPlaceServiceHandler {
         }
 
         return GetOrgItemsResult.newBuilder().addAllItems(result).build();
+    }
+
+    public MarketPlaceProto.CheckOutResult checkout(@NonNull final String userId,
+                                                    @NonNull final MarketPlaceProto.CheckOutRequest request) {
+        log.info("User {} requested checkout with request: {}", userId, request);
+        final List<MarketPlaceProto.Order> successOrders = new ArrayList<>();
+        final Map<Integer, MarketPlaceProto.FailedCheckOutCause> failedItems = new HashMap<>();
+        final List<Integer> batchFailedItemIds = new ArrayList<>();
+        List<Item> itemsList;
+        itemsList = itemDao.batchLoad(request.getItemsMap().keySet(), batchFailedItemIds);
+        itemsList = splitOutOfStockItems(itemsList, failedItems, request.getItemsMap());
+        addAllInvalidItems(batchFailedItemIds, failedItems);
+        final Map<String, List<Item>> orgIdToItemsMap = mapOrgIdToItems(itemsList);
+        for (String orgId : orgIdToItemsMap.keySet()) {
+            // Process each organization's order separately, in a batch
+            TransactionServiceHandler.Stepper stepper = null;
+            try {
+                final Organization organization = orgServiceHandler.getOrg(orgId).orElseThrow(
+                        () -> new IllegalArgumentException(String.format("OrgId %s is invalid", orgId)));
+                final Order order = generateOrderFromCheckOutItems(userId, organization, orgIdToItemsMap.get(orgId),
+                        request.getItemsMap());
+                stepper = transactionServiceHandler.createPaymentStepper(userId,
+                        TransactionProto.PaymentRequest.newBuilder()
+                        .setType(TransactionProto.PaymentRequest.Type.PAY)
+                        .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder()
+                                .setCurrencyId(order.getCurrency())
+                                .setAmount(order.getTotal())
+                                .build())
+                        .setRecipientId(organization.getOrgName())
+                        .setNote(String.format("Order %s", order.getOrderId()))
+                        .build());
+                log.debug("Generated transaction stepper with transactionId {}", stepper.getTransaction().getTransactionId());
+                order.setTransactionId(stepper.getTransaction().getTransactionId());
+                log.info("Order generated: {}", order);
+                orderDao.save(order);
+                stepper.commit();
+                successOrders.add(convertOrderModelToGrpcOrder(order));
+            } catch (Exception e) {
+                if (stepper != null) {
+                    stepper.abort();
+                }
+                orgIdToItemsMap.get(orgId).forEach(a -> failedItems.put(a.getItemID(),
+                        MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST));
+                log.error("Exception occurred while checking out user {} with request: {}", userId, request, e);
+            }
+        }
+        log.info("Finished processing checkout for user {}, success: {}, failed: {}", userId,
+                successOrders.size(), failedItems.size());
+        return MarketPlaceProto.CheckOutResult.newBuilder()
+                .addAllSuccessOrders(successOrders)
+                .putAllFailedItems(failedItems)
+                .build();
+    }
+
+    private static void addAllInvalidItems(@NonNull final Collection<Integer> failedItemIds, @NonNull final Map<Integer,
+            MarketPlaceProto.FailedCheckOutCause> failedItems) {
+        failedItemIds.forEach(a -> failedItems.put(a, MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST));
+    }
+
+    private static List<Item> splitOutOfStockItems(@NonNull final Collection<Item> src, @NonNull final Map<Integer,
+            MarketPlaceProto.FailedCheckOutCause> failedItems,
+                                                   @NonNull final Map<Integer, Integer> itemIdToQuantityMap) {
+        final List<Item> validItems = new ArrayList<>();
+        src.forEach(a -> {
+            if (a.getStock() <= 0 || a.getStock() < itemIdToQuantityMap.get(a.getItemID())) {
+                failedItems.put(a.getItemID(), MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK);
+            } else {
+                validItems.add(a);
+            }
+        });
+        return validItems;
+    }
+
+    private static Order generateOrderFromCheckOutItems(String userId, Organization organization, Collection<Item> items,
+                                                        Map<Integer, Integer> orderItems) {
+        final String currentDate = TimeUtils.formatDate(new Date());
+        final double totalCost = calculateTotalCost(items, orderItems);
+//        if (totalCost < 0) {
+//            log.error("Negative total cost {} detected, items: {}, orderItems: {}", totalCost, items, orderItems);
+//            throw new IllegalArgumentException(String.format("Invalid total cost %f detected", totalCost));
+//        }
+        return Order.builder()
+                .orderId(generateUniqueOrderId())
+                .currency(organization.getOrgCurrency())
+                .buyerId(userId)
+                .sellerId(organization.getOrgName())
+                .status(OrderStatus.PENDING_PAYMENT)
+                .total(totalCost)
+                .items(items.stream().map(a -> ItemInfo.builder()
+                        .itemId(a.getItemID())
+                        .price(a.getItemPrice())
+                        .itemName(a.getItemName())
+                        .quantity(orderItems.get(a.getItemID()))
+                        .build()).collect(Collectors.toList())
+                )
+                .createdAt(currentDate)
+                .lastUpdatedAt(currentDate)
+                .build();
+    }
+
+    private static double calculateTotalCost(Collection<Item> items, Map<Integer, Integer> orderItems) {
+        double total = 0.0;
+        for (Item item : items) {
+            total += item.getItemPrice() * orderItems.get(item.getItemID());
+        }
+        return total;
+    }
+
+    private static Map<String, List<Item>> mapOrgIdToItems(final List<Item> items) {
+        final Map<String, List<Item>> result = new HashMap<>();
+        for (Item item : items) {
+            final List<Item> orgCheckOutItems = result.computeIfAbsent(item.getBelongTo(), k -> new ArrayList<>());
+            orgCheckOutItems.add(item);
+        }
+        return result;
+    }
+
+    private static String generateUniqueOrderId() {
+        return UUID.randomUUID().toString();
+    }
+
+    private static MarketPlaceProto.Order convertOrderModelToGrpcOrder(final Order order) {
+        return MarketPlaceProto.Order.newBuilder()
+                .setOrderId(order.getOrderId())
+                .setBuyerId(order.getBuyerId())
+                .setSellerId(order.getSellerId())
+                .setCurrency(order.getCurrency())
+                .setTotalAmount(order.getTotal())
+                .addAllItems(
+                        order.getItems().stream().map(a -> MarketPlaceProto.OrderedItem.newBuilder()
+                                .setItemId(a.getItemId())
+                                .setItemName(a.getItemName())
+                                .setItemPrice(a.getPrice())
+                                .setQuantity(a.getQuantity())
+                                .build()).collect(Collectors.toList())
+                )
+                .setTransactionId(order.getTransactionId())
+                .setStatus(MarketPlaceProto.OrderStatus.valueOf(order.getStatus().toString()))
+                .setLastUpdatedAt(order.getLastUpdatedAt())
+                .setCreatedAt(order.getCreatedAt())
+                .build();
     }
 
 //    public AddItemResult addItem(AddItemRequest request) {
@@ -83,7 +239,7 @@ public class MarketPlaceServiceHandler {
                 .setBelongTo(item.getBelongTo())
                 .setItemPrice(item.getItemPrice())
                 .setItemDescription(item.getItemDescription())
-                .setItemId(item.getItemID())
+                .setItemId(String.valueOf(item.getItemID()))
                 .setCategory(item.getItemCategory())
                 .setItemImageLink(item.getItemImageLink())
                 .build();
