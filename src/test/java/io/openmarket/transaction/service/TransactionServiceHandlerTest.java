@@ -14,6 +14,7 @@ import io.openmarket.transaction.grpc.TransactionProto;
 import io.openmarket.transaction.model.Transaction;
 import io.openmarket.transaction.model.TransactionErrorType;
 import io.openmarket.transaction.model.TransactionStatus;
+import io.openmarket.transaction.model.TransactionTask;
 import io.openmarket.transaction.model.TransactionType;
 import io.openmarket.transaction.utils.TransactionUtils;
 import io.openmarket.wallet.dao.dynamodb.WalletDao;
@@ -64,6 +65,43 @@ public class TransactionServiceHandlerTest {
         this.walletDao = mock(WalletDao.class);
         this.sqsPublisher = mock(SQSTransactionTaskPublisher.class);
         this.handler = new TransactionServiceHandler(transactionDao, walletDao, sqsPublisher, QUEUE_URL);
+    }
+
+    @Test
+    public void test_TransactionStepper_Commit() {
+        TransactionServiceHandler.Stepper stepper = handler.createPaymentStepper(MY_ID,
+                TransactionProto.PaymentRequest.newBuilder()
+                .setRecipientId(RECIPIENT_ID)
+                        .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder()
+                                .setCurrencyId("1")
+                                .setAmount(1.0)
+                                .build())
+                        .setType(TransactionProto.PaymentRequest.Type.TRANSFER)
+                .build());
+
+        verify(transactionDao, times(1)).save(stepper.getTransaction());
+        verify(sqsPublisher, times(0)).publish(anyString(), any());
+        stepper.commit();
+        verify(sqsPublisher, times(1)).publish(QUEUE_URL, TransactionTask.builder()
+                        .transactionId(stepper.getTransaction().getTransactionId()).build());
+    }
+
+    @Test
+    public void test_TransactionStepper_Abort() {
+        TransactionServiceHandler.Stepper stepper = handler.createPaymentStepper(MY_ID,
+                TransactionProto.PaymentRequest.newBuilder()
+                        .setRecipientId(RECIPIENT_ID)
+                        .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder()
+                                .setCurrencyId("1")
+                                .setAmount(1.0)
+                                .build())
+                        .setType(TransactionProto.PaymentRequest.Type.TRANSFER)
+                        .build());
+
+        verify(transactionDao, times(1)).save(stepper.getTransaction());
+        stepper.abort();
+        verify(sqsPublisher, times(0)).publish(anyString(), any());
+        verify(transactionDao, times(1)).delete(stepper.getTransaction());
     }
 
     @Test
