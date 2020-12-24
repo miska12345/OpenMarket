@@ -115,6 +115,42 @@ public class OrgServiceHandlerTest {
     }
 
     @Test
+    public void isUserFollowing_when_user_is() {
+        serviceHandler.addOrgRquest(TEST_REQUEST);
+        serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard").build());
+        assertEquals(true, serviceHandler.isUserFollowing(IsUserFollowingRequest
+                .newBuilder()
+                .setOrgId(TEST_REQUEST.getOrgName())
+                .setUserId("lookchard")
+                .build()
+            ).getIsFollowing()
+        );
+    }
+
+    @Test
+    public void isUserFollowing_when_user_is_not() {
+        serviceHandler.addOrgRquest(TEST_REQUEST);
+        assertEquals(false, serviceHandler.isUserFollowing(IsUserFollowingRequest
+                        .newBuilder()
+                        .setOrgId(TEST_REQUEST.getOrgName())
+                        .setUserId("lookchard")
+                        .build()
+                ).getIsFollowing()
+        );
+    }
+
+    @Test
+    public void isUserFollowing_when_org_doesnt_exist() {
+        assertEquals(false, serviceHandler.isUserFollowing(IsUserFollowingRequest
+                        .newBuilder()
+                        .setOrgId(TEST_REQUEST.getOrgName())
+                        .setUserId("lookchard")
+                        .build()
+                ).getIsFollowing()
+        );
+    }
+
+    @Test
     public void saveOrg_then_getOrgRequest_by_name() {
         Organization org = Organization.builder()
                 .orgCurrency("HELLO")
@@ -125,7 +161,6 @@ public class OrgServiceHandlerTest {
                 .orgPosterS3Key("FABAB")
                 .build();
         serviceHandler.addOrg(org);
-        System.out.println(org);
         OrganizationOuterClass.orgName req = OrganizationOuterClass.orgName.newBuilder()
                 .setOrgName(org.getOrgName())
                 .build();
@@ -157,7 +192,7 @@ public class OrgServiceHandlerTest {
     public void can_update_followers_if_new() {
         this.serviceHandler.addOrgRquest(TEST_REQUEST);
 
-        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard").build());
+        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard").build());
 
         Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
 
@@ -170,8 +205,8 @@ public class OrgServiceHandlerTest {
     public void can_update_followers_if_not_contains() {
         this.serviceHandler.addOrgRquest(TEST_REQUEST);
 
-        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard").build());
-        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard2").build());
+        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard").build());
+        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard2").build());
 
         Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
 
@@ -183,8 +218,8 @@ public class OrgServiceHandlerTest {
     public void cannot_update_followers_if_contains() {
         this.serviceHandler.addOrgRquest(TEST_REQUEST);
 
-        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard").build());
-        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard").build());
+        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard").build());
+        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard").build());
 
         Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
         assertEquals(1, updated.getOrgFollowerCount());
@@ -199,7 +234,7 @@ public class OrgServiceHandlerTest {
         for (int i = 0; i < 10; i++) {
             int finalI = i;
             Callable<String> task = () -> {
-                UpdateFollowerRequest request = UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserIds("lookchard" + finalI).build();
+                UpdateFollowerRequest request = UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard" + finalI).build();
                 this.serviceHandler.updateFollower(request);
                 return "";
             };

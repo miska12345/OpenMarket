@@ -12,6 +12,7 @@ import javax.inject.Inject;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidParameterException;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Random;
 
@@ -71,14 +72,44 @@ public final class AccountServiceHandler {
                 .setCred(token).build();
     }
 
-    public RegistrationResult register(@Nonnull final RegistrationRequest request) {
+    public GetUserResult getUser(GetUserRequest request) {
+        String userName = request.getUserId();
 
+        if (userName.isEmpty()) {
+            log.error("Empty userName is not allowed");
+            return GetUserResult.newBuilder().setError(GetUserResult.GetAllFollowError.USER_DOESNOT_EXIST).build();
+        }
+        Optional<Account> user = this.userDao.load(userName);
+
+        if (!user.isPresent()) {
+            log.error("Can not find user upon get user request");
+            return GetUserResult.newBuilder().setError(GetUserResult.GetAllFollowError.USER_DOESNOT_EXIST).build();
+        }
+
+        Account account = user.get();
+
+
+        User.Builder result = User.newBuilder()
+                .setDisplayName(account.getDisplayName())
+                .setPortraitKey(account.getPortraitS3Key())
+                .setUserName(account.getUsername());
+
+        if (account.getAllFollowing() != null)
+            result.addAllFollowing(account.getAllFollowing());
+
+        return GetUserResult.newBuilder()
+                .setError(GetUserResult.GetAllFollowError.NONE)
+                .setUser(result.build()).build();
+    }
+
+    public RegistrationResult register(@Nonnull final RegistrationRequest request) {
         if (request.getPassword().isEmpty() || request.getDisplayName().isEmpty()
-            ||request.getUsername().isEmpty()){
+            ||request.getUsername().isEmpty() || request.getPortraitS3Key().isEmpty()){
             log.info("Registration failed due to invalid parameter");
             return RegistrationResult.newBuilder()
                     .setRegisterStatus(RegistrationResult.Status.INVALID_PARAM).build();
         }
+
 
         Optional<Account> chekcDuplicate = userDao.load(request.getUsername());
 
@@ -96,7 +127,10 @@ public final class AccountServiceHandler {
         String hashedPass = hash(password, salt);
         Account newUser = Account.builder().username(username)
                 .passwordHash(hashedPass).passwordSalt(salt)
-                .displayName(displayName).build();
+                .displayName(displayName)
+                .portraitS3Key(request.getPortraitS3Key())
+                .build();
+
         this.userDao.save(newUser);
 
         transactionServiceHandler.createWalletForUser(username);
@@ -125,6 +159,12 @@ public final class AccountServiceHandler {
         Account existingAccount = potentialAccount.get();
 
         if (!request.getNewDisplayName().isEmpty()) existingAccount.setDisplayName(request.getNewDisplayName());
+        if (!request.getNewFollow().isEmpty()) {
+            if (existingAccount.getAllFollowing() == null) {
+                existingAccount.setAllFollowing(new HashSet<>());
+            }
+            existingAccount.getAllFollowing().add(request.getNewFollow());
+        }
         if (!request.getNewPassword().isEmpty()) {
             String salt = existingAccount.getPasswordSalt();
             existingAccount.setPasswordHash(hash(request.getNewPassword(), salt));
@@ -134,6 +174,7 @@ public final class AccountServiceHandler {
         return io.openmarket.account.grpc.AccountService.UpdateResult.newBuilder().setNewDisplayName(request.getNewDisplayName())
                 .setUpdateStatus(UpdateResult.Status.UPDATE_SUCCESS).build();
     }
+
 
     private void validateParam(String input) {
         if (input == null || input.isEmpty())

@@ -1,10 +1,7 @@
 package io.openmarket.organization;
 
 
-import com.amazonaws.services.dynamodbv2.model.AttributeValue;
-import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
-import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
-import com.amazonaws.services.dynamodbv2.model.UpdateItemResult;
+import com.amazonaws.services.dynamodbv2.model.*;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -75,7 +72,7 @@ public class OrgServiceHandler {
                         "#followerCount", ORG_DDB_ATTRIBUTE_FOLLOWERS_COUNT
                 ))
                 .withExpressionAttributeValues(ImmutableMap.of(
-                        ":newFollower", new AttributeValue().withSS(request.getUserIds()),
+                        ":newFollower", new AttributeValue().withSS(request.getUserId()),
                         ":val", new AttributeValue().withN("1")
                 ));
 
@@ -91,7 +88,37 @@ public class OrgServiceHandler {
         return this.orgDao.getFollowerIds(orgId);
     }
 
+    public IsUserFollowingResult isUserFollowing(IsUserFollowingRequest request) {
+        if (request.getUserId() == null || request.getUserId().isEmpty()){
+            log.error("Missing user id in isUserFollowing");
+            throw new IllegalArgumentException();
+        } else if (request.getOrgId() == null || request.getOrgId().isEmpty()) {
+            log.error("Missing org id in isUserFollowing");
+            throw new IllegalArgumentException();
+        }
 
+        QueryRequest queryRequest = new QueryRequest()
+                .withTableName(ORG_DDB_TABLE_NAME)
+                .withKeyConditionExpression("#id = :orgId")
+                .withFilterExpression("contains(#followers, :userId)")
+                .withExpressionAttributeNames(ImmutableMap.of(
+                        "#id", ORG_DDB_KEY_ORGNAME,
+                        "#followers", ORG_DDB_ATTRIBUTE_FOLLOWERS
+                ))
+                .withExpressionAttributeValues(ImmutableMap.of(
+                        ":orgId", new AttributeValue(request.getOrgId()),
+                        ":userId", new AttributeValue(request.getUserId())
+                ));
+
+        QueryResult result = this.orgDao.queryOrg(queryRequest);
+
+        IsUserFollowingResult rpcResult = IsUserFollowingResult
+                .newBuilder()
+                .setIsFollowing(result.getItems().size() > 0)
+                .build();
+
+        return rpcResult;
+    }
 
     public Optional<Organization> getOrg(String name) {
         return orgDao.load(name);
