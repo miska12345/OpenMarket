@@ -1,4 +1,5 @@
 package io.openmarket.server.services;
+import io.grpc.stub.StreamObserver;
 import io.openmarket.organization.OrgServiceHandler;
 import io.openmarket.organization.grpc.OrganizationGrpc;
 import io.openmarket.organization.grpc.OrganizationOuterClass;
@@ -12,6 +13,24 @@ public class OrganizationRPCService extends OrganizationGrpc.OrganizationImplBas
     @Inject
     public OrganizationRPCService(@NonNull final OrgServiceHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public void updateFollower(OrganizationOuterClass.UpdateFollowerRequest request, StreamObserver<OrganizationOuterClass.UpdateFollowerResult> responseObserver) {
+        responseObserver.onNext(handler.updateFollower(request));
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getFollowers(OrganizationOuterClass.GetFollowerRequest request, StreamObserver<OrganizationOuterClass.GetFollowerResult> responseObserver) {
+        responseObserver.onNext(handler.getFollowerIds(request));
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void isUserFollowing(OrganizationOuterClass.IsUserFollowingRequest request, StreamObserver<OrganizationOuterClass.IsUserFollowingResult> responseObserver) {
+        responseObserver.onNext(handler.isUserFollowing(request));
+        responseObserver.onCompleted();
     }
 
     @Override

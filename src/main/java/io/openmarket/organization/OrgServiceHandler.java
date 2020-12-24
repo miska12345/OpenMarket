@@ -84,8 +84,9 @@ public class OrgServiceHandler {
         return UpdateFollowerResult.newBuilder().build();
     }
 
-    public List<String> getFollowerIds(String orgId) {
-        return this.orgDao.getFollowerIds(orgId);
+    public GetFollowerResult getFollowerIds(GetFollowerRequest request) {
+        List<String> followers = this.orgDao.getFollowerIds(request.getOrgId());
+        return GetFollowerResult.newBuilder().addAllUserIds(followers).build();
     }
 
     public IsUserFollowingResult isUserFollowing(IsUserFollowingRequest request) {

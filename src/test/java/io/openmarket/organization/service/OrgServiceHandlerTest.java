@@ -197,7 +197,9 @@ public class OrgServiceHandlerTest {
         Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
 
         assertEquals(1, updated.getOrgFollowerCount());
-        assertEquals("lookchard", this.serviceHandler.getFollowerIds(TEST_REQUEST.getOrgName()).get(0));
+        assertEquals("lookchard", this.serviceHandler.getFollowerIds(
+                GetFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).build()
+        ).getUserIdsList().get(0));
 
     }
 

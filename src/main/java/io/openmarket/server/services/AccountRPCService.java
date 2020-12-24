@@ -27,10 +27,18 @@ public class AccountRPCService extends AccountGrpc.AccountImplBase {
         responseObserver.onCompleted();
     }
 
+
+    @Override
+    public void getUser(GetUserRequest request, StreamObserver<GetUserResult> responseObserver) {
+        responseObserver.onNext(accountHandler.getUser(request));
+        responseObserver.onCompleted();
+    }
+
     @Override
     public void handleRegister(RegistrationRequest request, StreamObserver<RegistrationResult> responseObserver) {
         RegistrationResult result = this.accountHandler.register(request);
         responseObserver.onNext(result);
         responseObserver.onCompleted();
     }
+
 }
