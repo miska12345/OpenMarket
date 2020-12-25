@@ -5,6 +5,9 @@ import dagger.Provides;
 import io.openmarket.account.dynamodb.UserDao;
 import io.openmarket.account.service.AccountServiceHandler;
 import io.openmarket.account.service.CredentialManager;
+import io.openmarket.marketplace.MarketPlaceServiceHandler;
+import io.openmarket.marketplace.dao.ItemDao;
+import io.openmarket.order.dao.OrderDao;
 import io.openmarket.organization.OrgServiceHandler;
 import io.openmarket.organization.dao.OrgDao;
 import io.openmarket.stamp.dao.dynamodb.StampEventDao;
@@ -13,13 +16,9 @@ import io.openmarket.transaction.dao.dynamodb.TransactionDao;
 import io.openmarket.transaction.dao.sqs.SQSTransactionTaskPublisher;
 import io.openmarket.transaction.service.TransactionServiceHandler;
 import io.openmarket.wallet.dao.dynamodb.WalletDao;
-import org.omg.SendingContext.RunTimeOperations;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
-
-import java.sql.Connection;
-import java.sql.DriverManager;
 
 import static io.openmarket.config.EnvironmentConfig.*;
 
@@ -53,6 +52,14 @@ public class OpenMarketModule {
     StampEventServiceHandler provideStampEventHandler(final StampEventDao eventDao,
                                                       final TransactionServiceHandler transactionServiceHandler) {
         return new StampEventServiceHandler(eventDao, transactionServiceHandler);
+    }
+
+    @Provides
+    @Singleton
+    MarketPlaceServiceHandler provideMarketPlaceHandler(final ItemDao itemDao, final OrderDao orderDao,
+                                                        final OrgServiceHandler orgServiceHandler,
+                                                        final TransactionServiceHandler transactionServiceHandler) {
+        return new MarketPlaceServiceHandler(itemDao, orderDao, orgServiceHandler, transactionServiceHandler);
     }
 
     @Provides
