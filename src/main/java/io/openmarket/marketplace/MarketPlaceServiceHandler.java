@@ -53,7 +53,7 @@ public class MarketPlaceServiceHandler {
         this.transactionServiceHandler = transactionServiceHandler;
         log.info("MarketPlaceServiceHandler started");
     }
-
+  
     public GetOrgItemsResult getListingByOrgId(GetOrgItemsRequest request) throws SQLException {
         List<Integer> itemIds = this.itemDao.getItemIdsByOrg(request.getOrgId());
         List<Integer> failedItemIds = new ArrayList<>();

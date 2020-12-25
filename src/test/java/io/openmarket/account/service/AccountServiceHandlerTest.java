@@ -12,11 +12,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
+    RegistrationRequest TEST_REQUEST = RegistrationRequest.newBuilder().setUsername("weifeng1")
+            .setPassword("123").setDisplayName("didntpay").setPortraitS3Key("sfasd").build();
+
 
     @Test
     public void can_Register_when_user_not_exist() {
-        ash.register(RegistrationRequest.newBuilder().setUsername("weifeng1")
-        .setPassword("123").setDisplayName("didntpay").build());
+        ash.register(TEST_REQUEST);
 
         Optional<Account> user1 = userDao.load("weifeng1");
         assertTrue(user1.isPresent());
@@ -26,12 +28,58 @@ public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
     }
 
     @Test
+    public void can_update_new_following() {
+        ash.register(TEST_REQUEST);
+
+        ash.updateUser(UpdateRequest.newBuilder().setUsername(TEST_REQUEST.getUsername()).setNewFollow("lookchard").build());
+
+        GetUserResult result = ash.getUser(GetUserRequest.newBuilder().setUserId(TEST_REQUEST.getUsername()).build());
+
+        assertEquals("lookchard", result.getUser().getFollowingList().get(0));
+    }
+
+    @Test
+    public void cannot_update_already_following() {
+        ash.register(TEST_REQUEST);
+
+        ash.updateUser(UpdateRequest.newBuilder().setUsername(TEST_REQUEST.getUsername()).setNewFollow("lookchard").build());
+        ash.updateUser(UpdateRequest.newBuilder().setUsername(TEST_REQUEST.getUsername()).setNewFollow("lookchard").build());
+
+        GetUserResult result = ash.getUser(GetUserRequest.newBuilder().setUserId(TEST_REQUEST.getUsername()).build());
+
+        assertEquals(1, result.getUser().getFollowingList().size());
+    }
+
+    @Test
+    public void can_getUser_when_exist() {
+        ash.register(TEST_REQUEST);
+
+        GetUserResult result = ash.getUser(GetUserRequest.newBuilder().setUserId(TEST_REQUEST.getUsername()).build());
+
+        assertEquals(result.getError(), GetUserResult.GetAllFollowError.NONE);
+        assertEquals(result.getUser().getUserName(), TEST_REQUEST.getUsername());
+    }
+
+    @Test
+    public void cannot_getUser_when_doesnot_exist() {
+        GetUserResult result = ash.getUser(GetUserRequest.newBuilder().setUserId(TEST_REQUEST.getUsername()).build());
+
+        assertEquals(result.getError(), GetUserResult.GetAllFollowError.USER_DOESNOT_EXIST);
+    }
+
+    @Test
+    public void cannot_getUser_when_request_empty() {
+        GetUserResult result = ash.getUser(GetUserRequest.newBuilder().build());
+
+        assertEquals(result.getError(), GetUserResult.GetAllFollowError.USER_DOESNOT_EXIST);
+    }
+
+
+    @Test
     public void cannot_Register_when_user_exists() {
-        ash.register(RegistrationRequest.newBuilder().setUsername("weifeng1")
-                .setPassword("123").setDisplayName("didntpay").build());
+        ash.register(TEST_REQUEST);
         RegistrationResult result = this.ash
-                .register(RegistrationRequest.newBuilder().setUsername("weifeng1")
-                .setPassword("123").setDisplayName("didntpay").build());
+                .register(TEST_REQUEST);
         assertEquals(RegistrationResult.Status.USERNAME_ALREADY_EXIST, result.getRegisterStatus());
     }
 
@@ -69,8 +117,7 @@ public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
 
     @Test
     public void can_Login_when_User_Exist() {
-        ash.register(RegistrationRequest.newBuilder().setUsername("weifeng1")
-                .setPassword("123").setDisplayName("didntpay").build());
+        ash.register(TEST_REQUEST);
 
         LoginResult res = ash.login(LoginRequest.newBuilder().setPassword("123").setUsername("weifeng1").build());
         assertNotNull(res.getCred());
@@ -114,8 +161,7 @@ public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
 
     @Test
     public void can_Update_when_User_Exist() {
-        ash.register(RegistrationRequest.newBuilder().setUsername("weifeng1")
-                .setPassword("123").setDisplayName("didntpay1").build());
+        ash.register(TEST_REQUEST);
         UpdateRequest request = UpdateRequest.newBuilder().setNewDisplayName("didntpay")
                 .setUsername("weifeng1").setNewPassword("321").build();
         UpdateResult result = ash.updateUser(request);
@@ -134,8 +180,7 @@ public class AccountServiceHandlerTest extends AccountTestTemplateLocalDB {
 
     @Test
     public void Update_would_not_change_other_field() {
-        ash.register(RegistrationRequest.newBuilder().setUsername("weifeng1")
-                .setPassword("123").setDisplayName("didntpay1").build());
+        ash.register(TEST_REQUEST);
 
         UpdateRequest nameUpdate = UpdateRequest.newBuilder().setNewDisplayName("didntpay")
                 .setUsername("weifeng1").build();
