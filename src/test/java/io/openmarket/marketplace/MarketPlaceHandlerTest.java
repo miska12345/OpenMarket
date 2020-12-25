@@ -319,6 +319,10 @@ public class MarketPlaceHandlerTest {
         verify(orderDao, times(2)).save(argThat(a -> a.getStatus()
                 .equals(OrderStatus.PAYMENT_CONFIRMED)));
         verify(transactionServiceHandler, times(2)).createPayment(eq(BUYER_ID), any());
+        assertEquals(1, result.getSuccessOrdersList().get(0).getItemsCount());
+        assertEquals(1, result.getSuccessOrdersList().get(1).getItemsCount());
+        assertEquals(ORG_B_ITEM_IN_STOCK.getItemID(), result.getSuccessOrdersList().get(0).getItemsList().get(0).getItemId());
+        assertEquals(ORG_A_ITEM_IN_STOCK.getItemID(), result.getSuccessOrdersList().get(1).getItemsList().get(0).getItemId());
     }
 
     @Test
@@ -394,6 +398,17 @@ public class MarketPlaceHandlerTest {
                         .build());
         assertResultCountMatches(0, 0, 1, result);
         verify(orderDao, times(1)).save(argThat(a -> a.getStatus().equals(OrderStatus.PENDING_PAYMENT)));
+    }
+
+    @Test
+    public void test_Negative_CheckOut_Quantity() {
+        Map<Integer, Integer> cart = ImmutableMap.of(ORG_A_ITEM_IN_STOCK.getItemID(), -1);
+        MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
+                .checkout(BUYER_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
+                        .putAllItems(cart)
+                        .build());
+        assertEquals(MarketPlaceProto.Error.INTERNAL_SERVICE_ERROR, result.getError());
+        assertResultCountMatches(0, 0, 0, result);
     }
 
     private boolean checkOrderIsCorrect(Map<Integer, Integer> cart, Order order) {

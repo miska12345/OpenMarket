@@ -39,7 +39,7 @@ public class MarketPlaceServiceHandler {
     private final OrgServiceHandler orgServiceHandler;
     private final TransactionServiceHandler transactionServiceHandler;
 
-    private static final int CHECKOUT_PAYMENT_MAX_ATTEMPTS = 3;
+    private static final int CHECKOUT_PAYMENT_MAX_ATTEMPTS = 10;
     private static final int CHECKOUT_PAYMENT_PERIOD = 1000;
 
     @Inject
@@ -99,6 +99,8 @@ public class MarketPlaceServiceHandler {
                             () -> new IllegalArgumentException(String.format("OrgId %s is invalid",
                                     itemsToCheckOut.getKey())));
 
+                    itemsList = itemsToCheckOut.getValue();
+
                     // A map of itemID to quantity.
                     final Map<Integer, Integer> polishedRequest = itemsToCheckOut.getValue().stream()
                             .collect(Collectors.toMap(Item::getItemID, a -> request.getItemsMap().get(a.getItemID())));
@@ -107,7 +109,7 @@ public class MarketPlaceServiceHandler {
                     Order order = generateOrderFromCheckOutItems(userId, organization,
                             itemsList, request.getItemsMap());
                     if (transactionServiceHandler.getBalanceForCurrency(userId, order.getCurrency()) < order.getTotal()) {
-                        log.info("User {} doesn't have enough {} to purchase order {}", userId, order.getCurrency(), itemsList);
+                        log.info("User {} doesn't have enough {} to check out order {}", userId, order.getCurrency(), itemsList);
                         moveAllInvalidItems(itemsList.stream().map(Item::getItemID).collect(Collectors.toList()),
                                 failedItems, itemsList,
                                 MarketPlaceProto.FailedCheckOutCause.INSUFFICIENT_BALANCE);
@@ -172,8 +174,8 @@ public class MarketPlaceServiceHandler {
                             itemsToCheckOut.getKey(), request);
                 }
             }
-            log.info("Finished processing checkout for user {}, success: {}, failed: {}", userId,
-                    successOrders.size(), failedItems.size());
+            log.info("Finished processing checkout for user {}, success: {}, failed: {}, action: {}", userId,
+                    successOrders.size(), failedItems.size(), actionRequiredOrders.size());
             return MarketPlaceProto.CheckOutResult.newBuilder()
                     .setError(MarketPlaceProto.Error.NONE)
                     .addAllSuccessOrders(successOrders)
@@ -211,9 +213,19 @@ public class MarketPlaceServiceHandler {
     }
 
     private static boolean isCheckOutRequestValid(MarketPlaceProto.CheckOutRequest request) {
-        return request.getItemsMap() != null;
+        if (request.getItemsMap() == null) {
+            return false;
+        }
+        // No negative or zero amounts allowed.
+        for (Integer quantity : request.getItemsMap().values()) {
+            if (quantity <= 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
+    // Move invalid items out of loadedItems and into the failedItems map with the given cause.
     @VisibleForTesting
     protected static void moveAllInvalidItems(@NonNull final Collection<Integer> failedItemIdsFromBatch,
                                             @NonNull final Map<Integer, MarketPlaceProto.FailedCheckOutCause> failedItems,
@@ -223,20 +235,6 @@ public class MarketPlaceServiceHandler {
         loadedItems.removeIf(a -> failedItemIdsFromBatch.contains(a.getItemID()));
     }
 
-//    private static List<Item> splitOutOfStockItems(@NonNull final Collection<Item> src, @NonNull final Map<Integer,
-//            MarketPlaceProto.FailedCheckOutCause> failedItems,
-//                                                   @NonNull final Map<Integer, Integer> itemIdToQuantityMap) {
-//        final List<Item> validItems = new ArrayList<>();
-//        src.forEach(a -> {
-//            if (a.getStock() <= 0 || a.getStock() < itemIdToQuantityMap.get(a.getItemID())) {
-//                failedItems.put(a.getItemID(), MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK);
-//            } else {
-//                validItems.add(a);
-//            }
-//        });
-//        return validItems;
-//    }
-
     @VisibleForTesting
     protected static Order generateOrderFromCheckOutItems(@NonNull final String userId,
                                                         @NonNull final Organization organization,
@@ -244,10 +242,6 @@ public class MarketPlaceServiceHandler {
                                                         @NonNull final Map<Integer, Integer> orderItems) {
         final String currentDate = TimeUtils.formatDate(new Date());
         final double totalCost = calculateTotalCost(items, orderItems);
-//        if (totalCost < 0) {
-//            log.error("Negative total cost {} detected, items: {}, orderItems: {}", totalCost, items, orderItems);
-//            throw new IllegalArgumentException(String.format("Invalid total cost %f detected", totalCost));
-//        }
         return Order.builder()
                 .orderId(generateUniqueOrderId())
                 .currency(organization.getOrgCurrency())
@@ -287,6 +281,7 @@ public class MarketPlaceServiceHandler {
     }
 
     private static String generateUniqueOrderId() {
+        // TODO: Avoid collision with a better generator.
         return UUID.randomUUID().toString();
     }
 
@@ -312,26 +307,6 @@ public class MarketPlaceServiceHandler {
                 .build();
     }
 
-//    public AddItemResult addItem(AddItemRequest request) {
-//        ItemGrpc item = request.getItem();
-//        if (!validateItemGrpc(item)) throw new IllegalArgumentException("Invalid add item request");
-//
-//        Item itemDb = Item.builder().itemName(item.getItemName())
-//                .itemCategory(item.getCategory())
-//                .itemDescription(item.getItemDescription())
-//                .itemImageLink(item.getItemImageLink())
-//                .itemPrice(item.getItemPrice())
-//                .stock(item.getItemStock())
-//                .belongTo(item.getBelongTo())
-//                .purchasedCount(0)
-//                .build();
-//        this.itemDao.save(itemDb);
-//        log.info("Created item with name {}, price {}, stock {}", item.getItemName()
-//                , item.getItemPrice(), item.getItemStck());
-//        return AddItemResult.newBuilder()
-//                .setItemName(item.getItemName()).setAddStatus(AddItemResult.Status.SUCCESS).build();
-//    }
-
     private boolean validateItemGrpc(MarketPlaceItem target) {
         if (target.getItemName().isEmpty() || target.getCategory().isEmpty()
             || target.getItemPrice() < 0 || target.getBelongTo().isEmpty()
@@ -353,147 +328,4 @@ public class MarketPlaceServiceHandler {
                 .setItemImageLink(item.getItemImageLink())
                 .build();
     }
-
-//    public GetSimilarItemsResult getSimilarItem(GetSimilarItemsRequest request) {
-//        if (request.getItemIds().isEmpty() || request.getItemCategory().isEmpty())
-//            throw new IllegalArgumentException("Invalid get item requests");
-//
-//        String itemid = request.getItemIds();
-//        if (!this.itemDao.load(itemid).isPresent()) throw new IllegalArgumentException("Invalid item id");
-//        log.info("Getting similar items for {}", itemid);
-//        String category = request.getItemCategory();
-//        int withCount = request.getWithCount();
-//
-//        //+1 to handle to the case when the item itself is in the return result
-//        List<String> ids = this.itemDao.getItemIdByCategory(category, withCount + 1);
-//        List<Item> similarItem = this.itemDao.batchLoad(ids);
-//        GetSimilarItemsResult.Builder response = GetSimilarItemsResult.newBuilder();
-//
-//        for(Item item : similarItem) {
-//            if (!item.getItemID().equals(itemid)) {
-//                response.addItems(convertToGrpc(item));
-//            }
-//        }
-//
-//        return response.build();
-//    }
-//
-//    public CheckOutResult checkout(String uesrId, CheckOutRequest request) {
-//        List<ItemGrpc> items = request.getItemsList();
-//        double total = 0.0;
-//        if (items.isEmpty()
-//        || request.getCurrencyId().isEmpty() || request.getFromOrg().isEmpty())
-//            throw new IllegalArgumentException("Invalid order");
-//
-//
-//        log.info("Checkout received from {} buying from {}",
-//                uesrId, request.getFromOrg());
-//
-//        //puts item on hold, not finalized until transcation is processed correctly
-//       CheckOutResult result = updateItemDB(items, null);
-//
-//       if (result.getUnprocessedItemCount() == items.size()) return result;
-//
-//       Set<ItemGrpc> unprocessed = new HashSet<>(result.getUnprocessedItemList());
-//       for (int i = 0; i < items.size(); i++) {
-//           ItemGrpc item = items.get(i);
-//
-//           if (!unprocessed.contains(item)) {
-//               Item dbItem = this.itemDao.load(item.getItemId()).get();
-//               total += dbItem.getItemPrice() * item.getItemCount();
-//           }
-//       }
-//
-//        String transactionId = transactionServiceHandler.createPayment(uesrId,
-//                TransactionProto.PaymentRequest.newBuilder()
-//                        .setType(TransactionProto.PaymentRequest.Type.TRANSFER)
-//                        .setRecipientId(request.getFromOrg())
-//                        .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder()
-//                                .setCurrencyId(request.getCurrencyId())
-//                                .setAmount(total)
-//                                .build())
-//                        .build()
-//        );
-//
-//        if(!checkTransactionStatus(transactionId)) {
-//            log.error("Transaction timed out");
-//            //revert item from on hold to available again
-//            updateItemDB(items, unprocessed);
-//            return CheckOutResult.newBuilder()
-//                    .setCheckoutStatus(CheckOutResult.Status.FAIL_TRANSACTION_TIME_OUT)
-//                    .addAllUnprocessedItem(items)
-//                    .build();
-//        }
-//        log.info("Checkout payment verifield from {}", uesrId);
-//
-//        return result;
-//    }
-//
-//    private boolean checkTransactionStatus(String transactionId) {
-//        for (int i = 0; i < CHECKOUT_TIMEOUT; i++) {
-//            TransactionStatus paymentStatus = transactionServiceHandler.getTransactionStatus(transactionId);
-//            if (paymentStatus.equals(TransactionStatus.COMPLETED)){
-//                return true;
-//            }
-//            try{ Thread.sleep(CHECKOUT_QUERY_DELAY); }
-//            catch (Exception e) { log.error(e.getStackTrace()); }
-//        }
-//        return false;
-//    }
-
-//    private CheckOutResult updateItemDB(List<ItemGrpc> items, Set<ItemGrpc> unprocessed) {
-//        CheckOutResult.Builder response = CheckOutResult.newBuilder();
-//
-//        for(int i = 0; i < items.size(); i++) {
-//            ItemGrpc item = items.get(i);
-//            String updateExpression = "SET #count = #count - :hold, #purchaseCount = #purchaseCount + :val";
-//            String conditionExpression = "#count >= :hold";
-//
-//            if (!this.itemDao.load(item.getItemId()).isPresent()) {
-//                response.addUnprocessedItem(item);
-//                continue;
-//            }
-//            else if (unprocessed != null && !unprocessed.contains(item)) {
-//                updateExpression = "SET #count = #count + :hold, #purchaseCount = #purchaseCount - :val";
-//                conditionExpression = null;
-//            }
-//
-//            final UpdateItemRequest updateRequest = new UpdateItemRequest().withTableName(ITEM_DDB_TABLE_NAME)
-//                    .withKey(ImmutableMap.of(ITEM_DDB_ATTRIBUTE_ID, new AttributeValue(item.getItemId())))
-//                    .withUpdateExpression(updateExpression)
-//                    .withConditionExpression(conditionExpression)
-//                    .withExpressionAttributeNames(
-//                            ImmutableMap.of("#count", ITEM_DDB_ATTRIBUTE_STOCK,
-//                            "#purchaseCount", ITEM_DDB_ATTRIBUTE_PURCHASE_COUNT)
-//                    ).withExpressionAttributeValues(
-//                            ImmutableMap.of(":hold", new AttributeValue().withN(String.valueOf(item.getItemCount())),
-//                                            ":val", new AttributeValue().withN("1")
-//                                    //TODO change the constant string 1 to itemCount
-//                            )
-//                    );
-//
-//            try {
-//                this.itemDao.update(updateRequest);
-//            } catch (ConditionalCheckFailedException e) {
-//                log.error("Item {} with id {} out of stock", item.getItemName(), item.getItemId());
-//                response.setCheckoutStatus(CheckOutResult.Status.SUCESS_WITH_FEW_ITEM_OUT_OF_STOCK);
-//                response.addUnprocessedItem(item);
-//            }
-//        }
-//
-//        if (response.getUnprocessedItemCount() == items.size()) {
-//            log.info("None of the item is in stock, try again later");
-//            response.setCheckoutStatus(CheckOutResult.Status.FAIL_ITEM_OUT_OF_STOCK);
-//            return response.build();
-//        }
-//        else if (response.getCheckoutStatus().equals(CheckOutResult.Status.SUCESS_WITH_FEW_ITEM_OUT_OF_STOCK)) {
-//            log.info("Succesfully checked out {} item, with {} item out of stock",
-//                    items.size() - response.getUnprocessedItemCount(), response.getUnprocessedItemCount());
-//            return response.build();
-//        }
-//
-//        log.info("Succesfully checked out {} item", items.size());
-//        return response.setCheckoutStatus(CheckOutResult.Status.SUCCESS).build();
-//    }
-
 }
