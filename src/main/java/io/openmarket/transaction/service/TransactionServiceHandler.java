@@ -23,6 +23,7 @@ import io.openmarket.transaction.utils.TransactionUtils;
 import io.openmarket.utils.TimeUtils;
 import io.openmarket.wallet.dao.dynamodb.WalletDao;
 import io.openmarket.wallet.model.Wallet;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
 
@@ -146,6 +147,19 @@ public class TransactionServiceHandler {
     }
 
     public String createPayment(final String payerId, TransactionProto.PaymentRequest request) {
+        final Transaction transaction = createPaymentDraft(payerId, request);
+        transactionDao.save(transaction);
+        sendTransactionToProcessorQueue(transaction);
+        return transaction.getTransactionId();
+    }
+
+    public Stepper createPaymentStepper(final String payerId, TransactionProto.PaymentRequest request) {
+        final Transaction transaction = createPaymentDraft(payerId, request);
+        transactionDao.save(transaction);
+        return new Stepper(transaction);
+    }
+
+    public Transaction createPaymentDraft(final String payerId, TransactionProto.PaymentRequest request) {
         if (!isPaymentRequestValid(request)
                 || request.getRecipientId().equals(payerId)) {
             log.error("Payment requested by '{}' is invalid: {}", payerId, request);
@@ -163,8 +177,7 @@ public class TransactionServiceHandler {
                 .note(request.getNote())
                 .error(TRANSACTION_INITIAL_ERROR_TYPE)
                 .build();
-        createTransaction(transaction);
-        return transaction.getTransactionId();
+        return transaction;
     }
 
     public TransactionProto.GetWalletResult getWallet(final String userId, TransactionProto.GetWalletRequest request) {
@@ -191,6 +204,17 @@ public class TransactionServiceHandler {
         walletDao.save(Wallet.builder().ownerId(userId).coins(NewAccountConfig.INITIAL_PROFILE).build());
     }
 
+
+    public double getBalanceForCurrency(@NonNull final String userId, @NonNull final String currency) {
+        double balance = 0.0;
+        Optional<Wallet> wallet = walletDao.load(userId);
+        if (!wallet.isPresent()) {
+            return balance;
+        }
+        balance = wallet.get().getCoins().getOrDefault(currency, balance);
+        return balance;
+    }
+
     private void createRefundTransactionPair(final Transaction source, final Transaction refundTransaction) {
         transactionDao.transactionWrite(new TransactionWriteRequest()
                 .addUpdate(source)
@@ -199,8 +223,7 @@ public class TransactionServiceHandler {
         sqsPublisher.publish(queueURL, new TransactionTask(refundTransaction.getTransactionId()));
     }
 
-    private void createTransaction(final Transaction transaction) {
-        transactionDao.save(transaction);
+    private void sendTransactionToProcessorQueue(final Transaction transaction) {
         sqsPublisher.publish(queueURL, new TransactionTask(transaction.getTransactionId()));
         log.info("Created a new transaction: {}", transaction);
     }
@@ -263,7 +286,7 @@ public class TransactionServiceHandler {
                         .setError(TransactionProto.ErrorCategory.valueOf(t.getError().toString()))
                         .setNote(t.getNote())
                 .build()).collect(Collectors.toList()))
-                .setLastEvaluatedKey(lastEvaluatedKey == null ? "xxxx" : GSON.toJson(lastEvaluatedKey))
+                .setLastEvaluatedKey(lastEvaluatedKey == null ? "" : GSON.toJson(lastEvaluatedKey))
                 .build();
     }
 
@@ -277,5 +300,28 @@ public class TransactionServiceHandler {
     @VisibleForTesting
     protected boolean isRefundRequestValid(final TransactionProto.RefundRequest request) {
         return !request.getTransactionId().trim().isEmpty();
+    }
+
+    /**
+     * A stepper that allows committing or aborting a transaction before it is processed.
+     */
+    public class Stepper {
+        @Getter
+        private final Transaction transaction;
+        private boolean hasCommitted = false;
+        public Stepper(@NonNull final Transaction transactionId) {
+            this.transaction = transactionId;
+        }
+
+        public void commit() {
+            sendTransactionToProcessorQueue(this.transaction);
+            hasCommitted = true;
+        }
+
+        public void abort() {
+            if (!hasCommitted) {
+                transactionDao.delete(this.transaction);
+            }
+        }
     }
 }
