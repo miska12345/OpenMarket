@@ -68,6 +68,20 @@ public class TransactionServiceHandlerTest {
     }
 
     @Test
+    public void testGetBalanceForCurrency() {
+        when(walletDao.load(MY_ID))
+                .thenReturn(Optional.of(Wallet.builder().ownerId(MY_ID).coins(ImmutableMap.of(CURRENCY_ID, 100.0)).build()));
+        assertEquals(100.0, handler.getBalanceForCurrency(MY_ID, CURRENCY_ID));
+    }
+
+    @Test
+    public void testGetBalanceForCurrency_No_Such_Currency() {
+        when(walletDao.load(MY_ID))
+                .thenReturn(Optional.of(Wallet.builder().ownerId(MY_ID).coins(Collections.emptyMap()).build()));
+        assertEquals(0.0, handler.getBalanceForCurrency(MY_ID, CURRENCY_ID));
+    }
+
+    @Test
     public void test_TransactionStepper_Commit() {
         TransactionServiceHandler.Stepper stepper = handler.createPaymentStepper(MY_ID,
                 TransactionProto.PaymentRequest.newBuilder()

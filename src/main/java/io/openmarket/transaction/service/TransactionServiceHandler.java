@@ -204,6 +204,17 @@ public class TransactionServiceHandler {
         walletDao.save(Wallet.builder().ownerId(userId).coins(NewAccountConfig.INITIAL_PROFILE).build());
     }
 
+
+    public double getBalanceForCurrency(@NonNull final String userId, @NonNull final String currency) {
+        double balance = 0.0;
+        Optional<Wallet> wallet = walletDao.load(userId);
+        if (!wallet.isPresent()) {
+            return balance;
+        }
+        balance = wallet.get().getCoins().getOrDefault(currency, balance);
+        return balance;
+    }
+
     private void createRefundTransactionPair(final Transaction source, final Transaction refundTransaction) {
         transactionDao.transactionWrite(new TransactionWriteRequest()
                 .addUpdate(source)
