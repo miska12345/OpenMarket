@@ -13,6 +13,7 @@ import io.openmarket.organization.OrgServiceHandler;
 import io.openmarket.organization.model.Organization;
 import io.openmarket.transaction.model.TransactionStatus;
 import io.openmarket.transaction.service.TransactionServiceHandler;
+import io.openmarket.utils.TimeUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -20,13 +21,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 public class MarketPlaceHandlerTest {
@@ -76,6 +77,18 @@ public class MarketPlaceHandlerTest {
             ORG_A_ITEM_IN_STOCK_2.getItemID(), ORG_A_ITEM_IN_STOCK_2.getItemPrice(),
             ORG_A_ITEM_OUT_OF_STOCK.getItemID(), ORG_A_ITEM_OUT_OF_STOCK.getItemPrice()
             );
+
+    private static final Order ORDER_A = Order.builder()
+            .orderId("abc")
+            .buyerId(BUYER_ID)
+            .sellerId(SELLER_ID)
+            .currency("DashCoin")
+            .items(ImmutableList.of())
+            .transactionId("123")
+            .status(OrderStatus.PAYMENT_CONFIRMED)
+            .lastUpdatedAt(TimeUtils.formatDate(new Date()))
+            .createdAt(TimeUtils.formatDate(new Date()))
+            .build();
 
     private ItemDao itemDao;
     private OrderDao orderDao;
@@ -132,6 +145,61 @@ public class MarketPlaceHandlerTest {
     }
 
     @Test
+    public void testGetAllOrdersAsBuyer() {
+        when(orderDao.batchLoad(anyCollection())).thenAnswer(a -> {
+           List<Order> orders = new ArrayList<>();
+           orders.add(ORDER_A);
+           return orders;
+        });
+        when(orderDao.getOrderByBuyer(anyString(), anyMap(), anyCollection(), anyInt())).thenAnswer(a -> {
+           Collection<String> ids = a.getArgument(2);
+           System.out.println(ids);
+           ids.add(ORDER_A.getOrderId());
+           return null;
+        });
+        MarketPlaceProto.GetAllOrdersResult result = marketPlaceServiceHandler
+                .getOrders(BUYER_ID, MarketPlaceProto.GetAllOrdersRequest.newBuilder()
+                .setRole(MarketPlaceProto.Role.BUYER)
+                .setMaxCount(1)
+                .build()
+        );
+        verify(orderDao, times(1)).getOrderByBuyer(eq(BUYER_ID), any(), any(), eq(1));
+        assertEquals(1, result.getOrdersCount());
+    }
+
+    @Test
+    public void testGetAllOrdersAsSeller() {
+        when(orderDao.batchLoad(anyCollection())).thenAnswer(a -> {
+            List<Order> orders = new ArrayList<>();
+            orders.add(ORDER_A);
+            return orders;
+        });
+        when(orderDao.getOrderByBuyer(anyString(), anyMap(), anyCollection(), anyInt())).thenAnswer(a -> {
+            Collection<String> ids = a.getArgument(2);
+            ids.add(ORDER_A.getOrderId());
+            return null;
+        });
+        MarketPlaceProto.GetAllOrdersResult result = marketPlaceServiceHandler
+                .getOrders(SELLER_ID, MarketPlaceProto.GetAllOrdersRequest.newBuilder()
+                        .setRole(MarketPlaceProto.Role.SELLER)
+                        .setMaxCount(1)
+                        .build()
+                );
+        verify(orderDao, times(1)).getOrderBySeller(eq(SELLER_ID), any(), any(), eq(1));
+        assertEquals(1, result.getOrdersCount());
+    }
+
+    @Test
+    public void testGetAllOrders_Illegal_Request() {
+        assertThrows(IllegalArgumentException.class, () -> marketPlaceServiceHandler
+                .getOrders(SELLER_ID, MarketPlaceProto.GetAllOrdersRequest.newBuilder()
+                        .setRole(MarketPlaceProto.Role.SELLER)
+                        .setMaxCount(-1)
+                        .build()
+                ));
+    }
+
+    @Test
     public void test_CheckOut_Single_Item_Success() {
         Map<Integer, Integer> cart = ImmutableMap.of(ORG_A_ITEM_IN_STOCK.getItemID(), 1);
         mockSuccessTransaction();
@@ -150,7 +218,6 @@ public class MarketPlaceHandlerTest {
         assertResultCountMatches(1, 0, 0, result);
         verify(orderDao, times(1)).save(argThat(a -> a.getStatus()
                 .equals(OrderStatus.PAYMENT_CONFIRMED) && checkOrderIsCorrect(cart, a)));
-
     }
 
     @Test

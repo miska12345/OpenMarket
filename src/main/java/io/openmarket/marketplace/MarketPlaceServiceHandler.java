@@ -1,5 +1,6 @@
 package io.openmarket.marketplace;
 
+import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.google.common.annotations.VisibleForTesting;
 import io.openmarket.marketplace.dao.ItemDao;
 import io.openmarket.marketplace.grpc.MarketPlaceProto;
@@ -16,6 +17,7 @@ import io.openmarket.organization.model.Organization;
 import io.openmarket.transaction.grpc.TransactionProto;
 import io.openmarket.transaction.model.TransactionStatus;
 import io.openmarket.transaction.service.TransactionServiceHandler;
+import io.openmarket.utils.MiscUtils;
 import io.openmarket.utils.TimeUtils;
 import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
@@ -65,6 +67,31 @@ public class MarketPlaceServiceHandler {
         }
 
         return GetOrgItemsResult.newBuilder().addAllItems(result).build();
+    }
+
+    public MarketPlaceProto.GetAllOrdersResult getOrders(@NonNull final String userId,
+                                                         @NonNull final MarketPlaceProto.GetAllOrdersRequest request) {
+        if (!isGetOrderRequestValid(request)) {
+            log.warn("User {} issued an invalid get order request: {}", userId, request);
+            throw new IllegalArgumentException("Invalid get order request");
+        }
+        final List<String> orderIds = new ArrayList<>();
+        Map<String, AttributeValue> exclusiveStartKey = MiscUtils.getExclusiveStartKey(request.getExclusiveStartKey())
+                .orElse(null);
+        if (request.getRole().equals(MarketPlaceProto.Role.BUYER)) {
+            log.info("HEre");
+            exclusiveStartKey = orderDao.getOrderByBuyer(userId, exclusiveStartKey, orderIds, request.getMaxCount());
+        } else {
+            exclusiveStartKey = orderDao.getOrderBySeller(userId, exclusiveStartKey, orderIds, request.getMaxCount());
+        }
+
+        final List<Order> orders = orderDao.batchLoad(orderIds);
+        log.info("User {} got {} for request {}", userId, orders, request);
+        return MarketPlaceProto.GetAllOrdersResult.newBuilder()
+                .addAllOrders(orders.stream().map(MarketPlaceServiceHandler::convertOrderModelToGrpcOrder)
+                        .collect(Collectors.toList()))
+                .setLastEvaluatedKey(MiscUtils.convertToLastEvaluatedKey(exclusiveStartKey))
+                .build();
     }
 
     public MarketPlaceProto.CheckOutResult checkout(@NonNull final String userId,
@@ -189,6 +216,11 @@ public class MarketPlaceServiceHandler {
                     .build();
         }
     }
+
+    private boolean isGetOrderRequestValid(final MarketPlaceProto.GetAllOrdersRequest request) {
+        return request.getMaxCount() > 0;
+    }
+
 
     @VisibleForTesting
     protected void rollbackOrder(Map<Integer, Integer> itemIdsToQuantity) {
