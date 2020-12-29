@@ -4,16 +4,28 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.local.embedded.DynamoDBEmbedded;
 import com.amazonaws.services.dynamodbv2.local.shared.access.AmazonDynamoDBLocal;
-import com.amazonaws.services.dynamodbv2.model.*;
+import com.amazonaws.services.dynamodbv2.model.AttributeDefinition;
+import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
+import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
+import com.amazonaws.services.dynamodbv2.model.KeyType;
+import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughput;
+import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType;
+import com.amazonaws.services.dynamodbv2.model.ScanRequest;
+import com.amazonaws.services.dynamodbv2.model.ScanResult;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import io.openmarket.organization.OrgServiceHandler;
 import io.openmarket.organization.dao.OrgDaoImpl;
 import io.openmarket.organization.grpc.OrganizationOuterClass;
-import io.openmarket.organization.grpc.OrganizationOuterClass.*;
+import io.openmarket.organization.grpc.OrganizationOuterClass.GetFollowerRequest;
+import io.openmarket.organization.grpc.OrganizationOuterClass.IsUserFollowingRequest;
+import io.openmarket.organization.grpc.OrganizationOuterClass.OrgMetadata;
+import io.openmarket.organization.grpc.OrganizationOuterClass.UpdateFollowerRequest;
 import io.openmarket.organization.model.Organization;
-import org.checkerframework.dataflow.qual.TerminatesExecution;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,9 +33,9 @@ import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 
-import static io.openmarket.config.OrgConfig.*;
+import static io.openmarket.config.OrgConfig.ORG_DDB_KEY_ORGNAME;
+import static io.openmarket.config.OrgConfig.ORG_DDB_TABLE_NAME;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class OrgServiceHandlerTest {
@@ -42,7 +54,7 @@ public class OrgServiceHandlerTest {
             .orgPortraitS3Key("ldksjfasdo")
             .build();
 
-    OrganizationOuterClass.orgMetadata TEST_REQUEST = OrganizationOuterClass.orgMetadata.newBuilder()
+    OrganizationOuterClass.OrgMetadata TEST_REQUEST = OrganizationOuterClass.OrgMetadata.newBuilder()
             .setOrgCurrency("HELLO")
             .setOrgDescription("test")
             .setOrgName("testOrg")
@@ -81,11 +93,11 @@ public class OrgServiceHandlerTest {
 
     @Test
     public void saveOrgRequest_then_getOrg_by_name() {
-        serviceHandler.addOrgRquest(this.TEST_REQUEST);
+        serviceHandler.handleAddOrgRequest(this.TEST_REQUEST);
 
         ScanResult result = dbClient.scan(new ScanRequest().withTableName(ORG_DDB_TABLE_NAME));
         assertEquals(1, result.getItems().size());
-        Organization org = serviceHandler.getOrg("testOrg").get();
+        Organization org = serviceHandler.getOrgByName("testOrg").get();
         assertEquals(TEST_REQUEST.getOrgName(), org.getOrgName());
         assertTrue(TEST_REQUEST.getOrgCurrency().equals(org.getOrgCurrency()));
         assertEquals(TEST_REQUEST.getOrgPortraitS3Key(), org.getOrgPortraitS3Key());
@@ -104,11 +116,11 @@ public class OrgServiceHandlerTest {
                 .orgPortraitS3Key("ldksjfasdo")
                 .build();
         serviceHandler.addOrg(org);
-        Optional<Organization> opOrg = serviceHandler.getOrg("testOrg");
+        Optional<Organization> opOrg = serviceHandler.getOrgByName("testOrg");
         assertTrue(opOrg.isPresent());
         Organization testOrg = opOrg.get();
         assertEquals(testOrg.getOrgName(), org.getOrgName());
-        assertTrue(testOrg.getOrgCurrency().equals(org.getOrgCurrency()));
+        assertEquals(org.getOrgCurrency(), testOrg.getOrgCurrency());
         assertEquals(testOrg.getOrgPortraitS3Key(), org.getOrgPortraitS3Key());
         assertEquals(testOrg.getOrgOwnerId(), org.getOrgOwnerId());
         assertEquals(testOrg.getOrgDescription(), org.getOrgDescription());
@@ -116,7 +128,7 @@ public class OrgServiceHandlerTest {
 
     @Test
     public void isUserFollowing_when_user_is() {
-        serviceHandler.addOrgRquest(TEST_REQUEST);
+        serviceHandler.handleAddOrgRequest(TEST_REQUEST);
         serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard").build());
         assertEquals(true, serviceHandler.isUserFollowing(IsUserFollowingRequest
                 .newBuilder()
@@ -129,7 +141,7 @@ public class OrgServiceHandlerTest {
 
     @Test
     public void isUserFollowing_when_user_is_not() {
-        serviceHandler.addOrgRquest(TEST_REQUEST);
+        serviceHandler.handleAddOrgRequest(TEST_REQUEST);
         assertEquals(false, serviceHandler.isUserFollowing(IsUserFollowingRequest
                         .newBuilder()
                         .setOrgId(TEST_REQUEST.getOrgName())
@@ -141,13 +153,12 @@ public class OrgServiceHandlerTest {
 
     @Test
     public void isUserFollowing_when_org_doesnt_exist() {
-        assertEquals(false, serviceHandler.isUserFollowing(IsUserFollowingRequest
-                        .newBuilder()
-                        .setOrgId(TEST_REQUEST.getOrgName())
-                        .setUserId("lookchard")
-                        .build()
-                ).getIsFollowing()
-        );
+        assertFalse(serviceHandler.isUserFollowing(IsUserFollowingRequest
+                .newBuilder()
+                .setOrgId(TEST_REQUEST.getOrgName())
+                .setUserId("lookchard")
+                .build()
+        ).getIsFollowing());
     }
 
     @Test
@@ -161,16 +172,18 @@ public class OrgServiceHandlerTest {
                 .orgPosterS3Key("FABAB")
                 .build();
         serviceHandler.addOrg(org);
-        OrganizationOuterClass.orgName req = OrganizationOuterClass.orgName.newBuilder()
+        OrganizationOuterClass.GetOrgRequest req = OrganizationOuterClass.GetOrgRequest.newBuilder()
                 .setOrgName(org.getOrgName())
                 .build();
-        OrganizationOuterClass.orgMetadata ret = serviceHandler.getOrgRequest(req);
+        OrganizationOuterClass.GetOrgResult result = serviceHandler.getOrgRequest(req);
 
-        assertEquals(ret.getOrgName(), org.getOrgName());
-        assertTrue(ret.getOrgCurrency().equals(org.getOrgCurrency()));
-        assertEquals(ret.getOrgPortraitS3Key(), org.getOrgPortraitS3Key());
-        assertEquals(ret.getOrgOwnerId(), org.getOrgOwnerId());
-        assertEquals(ret.getOrgDescription(), org.getOrgDescription());
+        assertEquals(OrganizationOuterClass.Error.NONE, result.getError());
+        OrgMetadata orgMetadata = result.getOrganization();
+        assertEquals(orgMetadata.getOrgName(), org.getOrgName());
+        assertEquals(org.getOrgCurrency(), orgMetadata.getOrgCurrency());
+        assertEquals(orgMetadata.getOrgPortraitS3Key(), org.getOrgPortraitS3Key());
+        assertEquals(orgMetadata.getOrgOwnerId(), org.getOrgOwnerId());
+        assertEquals(orgMetadata.getOrgDescription(), org.getOrgDescription());
     }
 
     @Test
@@ -190,27 +203,27 @@ public class OrgServiceHandlerTest {
 
     @Test
     public void can_update_followers_if_new() {
-        this.serviceHandler.addOrgRquest(TEST_REQUEST);
+        this.serviceHandler.handleAddOrgRequest(TEST_REQUEST);
 
-        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard").build());
+        this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder()
+                .setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard").build());
 
-        Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
+        Organization updated = this.serviceHandler.getOrgByName(TEST_REQUEST.getOrgName()).get();
 
         assertEquals(1, updated.getOrgFollowerCount());
         assertEquals("lookchard", this.serviceHandler.getFollowerIds(
                 GetFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).build()
         ).getUserIdsList().get(0));
-
     }
 
     @Test
     public void can_update_followers_if_not_contains() {
-        this.serviceHandler.addOrgRquest(TEST_REQUEST);
+        this.serviceHandler.handleAddOrgRequest(TEST_REQUEST);
 
         this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard").build());
         this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard2").build());
 
-        Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
+        Organization updated = this.serviceHandler.getOrgByName(TEST_REQUEST.getOrgName()).get();
 
         assertEquals(2, updated.getOrgFollowerCount());
 
@@ -218,19 +231,19 @@ public class OrgServiceHandlerTest {
 
     @Test
     public void cannot_update_followers_if_contains() {
-        this.serviceHandler.addOrgRquest(TEST_REQUEST);
+        this.serviceHandler.handleAddOrgRequest(TEST_REQUEST);
 
         this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard").build());
         this.serviceHandler.updateFollower(UpdateFollowerRequest.newBuilder().setOrgId(TEST_REQUEST.getOrgName()).setUserId("lookchard").build());
 
-        Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
+        Organization updated = this.serviceHandler.getOrgByName(TEST_REQUEST.getOrgName()).get();
         assertEquals(1, updated.getOrgFollowerCount());
 
     }
 
     @Test
     public void update_follower_insanity_check() throws InterruptedException {
-        this.serviceHandler.addOrgRquest(TEST_REQUEST);
+        this.serviceHandler.handleAddOrgRequest(TEST_REQUEST);
         List<Callable<String>> tasks = new ArrayList<>();
         ExecutorService executor = Executors.newFixedThreadPool(10);
         for (int i = 0; i < 10; i++) {
@@ -245,7 +258,7 @@ public class OrgServiceHandlerTest {
 
         executor.invokeAll(tasks);
 
-        Organization updated = this.serviceHandler.getOrg(TEST_REQUEST.getOrgName()).get();
+        Organization updated = this.serviceHandler.getOrgByName(TEST_REQUEST.getOrgName()).get();
         assertEquals(10, updated.getOrgFollowerCount());
     }
 
@@ -255,7 +268,7 @@ public class OrgServiceHandlerTest {
     public void partial_update_org(){
         serviceHandler.addOrg(TEST_ORG);
 
-        OrganizationOuterClass.orgMetadata request = OrganizationOuterClass.orgMetadata.newBuilder()
+        OrganizationOuterClass.OrgMetadata request = OrganizationOuterClass.OrgMetadata.newBuilder()
                 .setOrgDescription("Description")
                 .setOrgName("testOrg")
                 .setOrgPortraitS3Key("key")
@@ -263,11 +276,11 @@ public class OrgServiceHandlerTest {
                 .setOrgOwnerId("owner1").build();
         serviceHandler.partialUpdateRequest(request);
 
-        Optional<Organization> opOrg = serviceHandler.getOrg("testOrg");
+        Optional<Organization> opOrg = serviceHandler.getOrgByName("testOrg");
         assertTrue(opOrg.isPresent());
         Organization testOrg = opOrg.get();
         assertEquals(testOrg.getOrgName(), "testOrg");
-        assertTrue(testOrg.getOrgCurrency().equals(TEST_ORG.getOrgCurrency()));
+        assertEquals(TEST_ORG.getOrgCurrency(), testOrg.getOrgCurrency());
         assertEquals(testOrg.getOrgPortraitS3Key(), "key");
         assertEquals(testOrg.getOrgPosterS3Key(), "FABA");
         assertEquals(testOrg.getOrgOwnerId(), TEST_ORG.getOrgOwnerId());
@@ -280,7 +293,7 @@ public class OrgServiceHandlerTest {
     public void cannotUpdate_without_orgName(){
         serviceHandler.addOrg(TEST_ORG);
 
-        OrganizationOuterClass.orgMetadata request = OrganizationOuterClass.orgMetadata.newBuilder()
+        OrganizationOuterClass.OrgMetadata request = OrganizationOuterClass.OrgMetadata.newBuilder()
                 .setOrgDescription("Description")
                 .setOrgPortraitS3Key("key")
                 .setOrgPosterS3Key("FABA")

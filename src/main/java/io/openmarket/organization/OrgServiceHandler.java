@@ -1,49 +1,58 @@
 package io.openmarket.organization;
 
 
-import com.amazonaws.services.dynamodbv2.model.*;
-import com.google.common.collect.ImmutableList;
+import com.amazonaws.services.dynamodbv2.model.AttributeValue;
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
+import com.amazonaws.services.dynamodbv2.model.QueryRequest;
+import com.amazonaws.services.dynamodbv2.model.QueryResult;
+import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import io.openmarket.organization.dao.OrgDao;
-import io.openmarket.organization.grpc.OrganizationOuterClass.*;
+import io.openmarket.organization.grpc.OrganizationOuterClass;
+import io.openmarket.organization.grpc.OrganizationOuterClass.GetFollowerRequest;
+import io.openmarket.organization.grpc.OrganizationOuterClass.GetFollowerResult;
+import io.openmarket.organization.grpc.OrganizationOuterClass.IsUserFollowingRequest;
+import io.openmarket.organization.grpc.OrganizationOuterClass.IsUserFollowingResult;
+import io.openmarket.organization.grpc.OrganizationOuterClass.OrgUpdateResult;
+import io.openmarket.organization.grpc.OrganizationOuterClass.UpdateFollowerRequest;
+import io.openmarket.organization.grpc.OrganizationOuterClass.UpdateFollowerResult;
 import io.openmarket.organization.model.Organization;
+import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
-import org.checkerframework.checker.nullness.Opt;
 
 import javax.inject.Inject;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 import static io.openmarket.config.OrgConfig.*;
 
 @Log4j2
 public class OrgServiceHandler {
-    protected OrgDao orgDao;
+    private final OrgDao orgDao;
 
 
     @Inject
-    public OrgServiceHandler (OrgDao orgDao) {
+    public OrgServiceHandler (@NonNull final OrgDao orgDao) {
         this.orgDao = orgDao;
     }
 
-    public orgName addOrgRquest(orgMetadata params) {
+    public OrganizationOuterClass.AddOrgResult handleAddOrgRequest(@NonNull final OrganizationOuterClass.OrgMetadata params) {
         validateOrgMetaDataOnCreate(params);
 
-        Optional<Organization> exist = orgDao.load(params.getOrgName());
+        final Optional<Organization> exist = orgDao.load(params.getOrgName());
         if (exist.isPresent()) {
-            log.info("Organization name has been occupied!");
-            return orgName.newBuilder().setOrgName(params.getOrgName()).build();
+            return OrganizationOuterClass.AddOrgResult.newBuilder()
+                    .setError(OrganizationOuterClass.AddOrgResult.AddOrgError.ALREADY_EXIST)
+                    .build();
         }
-
-        Organization newOrg = orgMetadata2Org(params);
-
+        final Organization newOrg = orgMetadata2Org(params);
         this.orgDao.save(newOrg);
-
-        //TODO change this to addOrgResult later
-        return orgName.newBuilder().setOrgName(params.getOrgName()).build();
+        return OrganizationOuterClass.AddOrgResult.newBuilder()
+                .setError(OrganizationOuterClass.AddOrgResult.AddOrgError.NONE)
+                .build();
     }
 
-    public void addOrg(Organization org) {
+    public void addOrg(@NonNull final Organization org) {
         if (orgDao.load(org.getOrgName()).isPresent()) {
             log.error("Organization name has been occupied!");
             throw new IllegalArgumentException("Organization name has been occupied!");
@@ -53,8 +62,6 @@ public class OrgServiceHandler {
         orgDao.save(org);
     }
 
-
-    //TODO add log 4 j debug
     public UpdateFollowerResult updateFollower(UpdateFollowerRequest request) {
         if (request.getOrgId() == null || request.getOrgId().isEmpty()) {
             log.error("Tried to update follower without org id");
@@ -113,32 +120,31 @@ public class OrgServiceHandler {
 
         QueryResult result = this.orgDao.queryOrg(queryRequest);
 
-        IsUserFollowingResult rpcResult = IsUserFollowingResult
+        return IsUserFollowingResult
                 .newBuilder()
                 .setIsFollowing(result.getItems().size() > 0)
                 .build();
-
-        return rpcResult;
     }
 
-    public Optional<Organization> getOrg(String name) {
+    public Optional<Organization> getOrgByName(String name) {
         return orgDao.load(name);
     }
 
-    public orgMetadata getOrgRequest(orgName params) {
-        if (params.getOrgName() == null || params.getOrgName().isEmpty()) {
+    public OrganizationOuterClass.GetOrgResult getOrgRequest(@NonNull final OrganizationOuterClass.GetOrgRequest request) {
+        if (request.getOrgName() == null || request.getOrgName().isEmpty()) {
             log.error("Missing organization name!");
-            throw new IllegalArgumentException("Missing organization name! on get organization request");
+            throw new IllegalArgumentException("Missing organization name on get organization request");
         }
-        Organization org = this.getOrg(params.getOrgName()).get();
-        if (org == null) {
-            log.error("Organization is missing!");
-            throw new IllegalArgumentException("Organization is missing!");
-        }
-        return this.org2OrgMetadata(org);
+        final Optional<Organization> organization = orgDao.load(request.getOrgName());
+        return organization.map(value -> OrganizationOuterClass.GetOrgResult.newBuilder()
+                .setError(OrganizationOuterClass.Error.NONE)
+                .setOrganization(org2OrgMetadata(value))
+                .build()).orElseGet(() -> OrganizationOuterClass.GetOrgResult.newBuilder()
+                .setError(OrganizationOuterClass.Error.ORG_DOES_NOT_EXIST)
+                .build());
     }
 
-    public OrgUpdateResult partialUpdateRequest(orgMetadata params) {
+    public OrgUpdateResult partialUpdateRequest(OrganizationOuterClass.OrgMetadata params) {
         if (params.getOrgName() == null || params.getOrgName().isEmpty()){
             log.error("Missing organization name!");
             throw new IllegalArgumentException("Missing organization name on update request!");
@@ -174,7 +180,7 @@ public class OrgServiceHandler {
 
     }
 
-    private void validateOrgMetaDataOnCreate(orgMetadata params) {
+    private void validateOrgMetaDataOnCreate(OrganizationOuterClass.OrgMetadata params) {
         if (params.getOrgName().isEmpty() || params.getOrgName() == null){
             log.error("Organization name is missing!");
             throw new IllegalArgumentException("Organization name is missing!");
@@ -201,7 +207,7 @@ public class OrgServiceHandler {
         }
     }
 
-    private Organization orgMetadata2Org (orgMetadata params) {
+    private Organization orgMetadata2Org (OrganizationOuterClass.OrgMetadata params) {
 
         return Organization.builder().orgName(params.getOrgName())
                 .orgPosterS3Key(params.getOrgPosterS3Key())
@@ -214,27 +220,27 @@ public class OrgServiceHandler {
     }
 
 
-    private orgMetadata org2OrgMetadata (Organization org) {
-        if (org.getOrgName() == null || org.getOrgName().isEmpty()) {
-            log.error("Organization name is missing!");
-            throw new IllegalArgumentException("Organization name is missing!");
-        }
+    private OrganizationOuterClass.OrgMetadata org2OrgMetadata (@NonNull final Organization org) {
+//        if (org.getOrgName() == null || org.getOrgName().isEmpty()) {
+//            log.error("Organization name is missing!");
+//            throw new IllegalArgumentException("Organization name is missing!");
+//        }
 
-        if (org.getOrgPosterS3Key().isEmpty()) {
-            log.error("Organization poster key is missing");
-            throw new IllegalArgumentException();
-        }
+//        if (org.getOrgPosterS3Key().isEmpty()) {
+//            log.error("Organization poster key is missing");
+//            throw new IllegalArgumentException();
+//        }
+//
+//        if (org.getOrgPortraitS3Key().isEmpty()) {
+//            log.error("Organization portrait key is missing");
+//            throw new IllegalArgumentException();
+//        }
 
-        if (org.getOrgPortraitS3Key().isEmpty()) {
-            log.error("Organization portrait key is missing");
-            throw new IllegalArgumentException();
-        }
-
-        if (org.getOrgOwnerId().isEmpty()) {
-            log.error("Organization owner name is missing!");
-            throw new IllegalArgumentException("Organization owner name is missing!");
-        }
-        return orgMetadata.newBuilder()
+//        if (org.getOrgOwnerId().isEmpty()) {
+//            log.error("Organization owner name is missing!");
+//            throw new IllegalArgumentException("Organization owner name is missing!");
+//        }
+        return OrganizationOuterClass.OrgMetadata.newBuilder()
                 .setOrgCurrency(org.getOrgCurrency())
                 .setOrgOwnerId(org.getOrgOwnerId())
                 .setOrgDescription(org.getOrgDescription())
@@ -242,6 +248,4 @@ public class OrgServiceHandler {
                 .setOrgName(org.getOrgName())
                 .build();
     }
-
-
 }

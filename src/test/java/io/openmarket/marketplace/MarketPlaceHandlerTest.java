@@ -223,7 +223,7 @@ public class MarketPlaceHandlerTest {
         when(itemDao.batchLoad(anyCollection(), any())).thenAnswer(a -> {
            return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_IN_STOCK));
         });
-        when(orgServiceHandler.getOrg(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
         when(itemDao.updateItemStock(anyMap())).thenReturn(new ArrayList<>());
 
         MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
@@ -244,7 +244,7 @@ public class MarketPlaceHandlerTest {
         when(itemDao.batchLoad(anyCollection(), any())).thenAnswer(a -> {
             return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_OUT_OF_STOCK));
         });
-        when(orgServiceHandler.getOrg(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
         when(itemDao.updateItemStock(anyMap())).thenReturn(new ArrayList<>(Collections.singletonList(ORG_A_ITEM_OUT_OF_STOCK.getItemID())));
         MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
                 .checkout(BUYER_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
@@ -266,7 +266,7 @@ public class MarketPlaceHandlerTest {
         when(itemDao.batchLoad(anyCollection(), any())).thenAnswer(a -> {
             return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_IN_STOCK, ORG_A_ITEM_IN_STOCK_2));
         });
-        when(orgServiceHandler.getOrg(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
         when(itemDao.updateItemStock(anyMap())).thenReturn(new ArrayList<>());
         MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
                 .checkout(BUYER_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
@@ -287,7 +287,7 @@ public class MarketPlaceHandlerTest {
         when(itemDao.batchLoad(anyCollection(), any())).thenAnswer(a -> {
             return new ArrayList<>(ImmutableList.of(INVALID_ITEM));
         });
-        when(orgServiceHandler.getOrg(INVALID_ITEM.getBelongTo())).thenReturn(Optional.empty());
+        when(orgServiceHandler.getOrgByName(INVALID_ITEM.getBelongTo())).thenReturn(Optional.empty());
         MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
                 .checkout(BUYER_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
                         .putAllItems(cart)
@@ -310,7 +310,7 @@ public class MarketPlaceHandlerTest {
             failedItemID.addAll(a.getArgument(0));
             return Collections.emptyList();
         });
-        when(orgServiceHandler.getOrg(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
         MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
                 .checkout(BUYER_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
                         .putAllItems(cart)
@@ -334,7 +334,7 @@ public class MarketPlaceHandlerTest {
         when(itemDao.batchLoad(anyCollection(), any())).thenAnswer(a -> {
             return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_IN_STOCK, ORG_A_ITEM_IN_STOCK_2, ORG_A_ITEM_OUT_OF_STOCK));
         });
-        when(orgServiceHandler.getOrg(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
         when(itemDao.updateItemStock(anyMap()))
                 .thenReturn(new ArrayList<>(Collections.singletonList(ORG_A_ITEM_OUT_OF_STOCK.getItemID())));
         MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
@@ -360,8 +360,8 @@ public class MarketPlaceHandlerTest {
             return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_IN_STOCK, ORG_B_ITEM_IN_STOCK));
         });
         when(transactionServiceHandler.createPaymentStepper(any(), any())).thenReturn(stepper);
-        when(orgServiceHandler.getOrg(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
-        when(orgServiceHandler.getOrg(ORGANIZATION_B.getOrgName())).thenReturn(Optional.of(ORGANIZATION_B));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_B.getOrgName())).thenReturn(Optional.of(ORGANIZATION_B));
         when(itemDao.updateItemStock(anyMap())).thenReturn(new ArrayList<>());
         MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
                 .checkout(BUYER_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
@@ -385,8 +385,8 @@ public class MarketPlaceHandlerTest {
         when(itemDao.batchLoad(anyCollection(), any())).thenAnswer(a -> {
             return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_IN_STOCK, ORG_B_ITEM_IN_STOCK, ORG_A_ITEM_OUT_OF_STOCK, INVALID_ITEM));
         });
-        when(orgServiceHandler.getOrg(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
-        when(orgServiceHandler.getOrg(ORGANIZATION_B.getOrgName())).thenReturn(Optional.of(ORGANIZATION_B));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_B.getOrgName())).thenReturn(Optional.of(ORGANIZATION_B));
         when(itemDao.batchLoad(anyCollection(), any())).thenAnswer(a -> {
             Collection<Integer> failedItemID = a.getArgument(1);
             failedItemID.add(INVALID_ITEM.getItemID());
@@ -431,7 +431,7 @@ public class MarketPlaceHandlerTest {
         when(itemDao.batchLoad(anyCollection(), any())).thenAnswer(a -> {
             return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_IN_STOCK));
         });
-        when(orgServiceHandler.getOrg(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
         MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
                 .checkout(BUYER_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
                         .putAllItems(cart)
@@ -455,7 +455,7 @@ public class MarketPlaceHandlerTest {
             return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_IN_STOCK));
         });
         when(itemDao.updateItemStock(any())).thenReturn(new ArrayList<>());
-        when(orgServiceHandler.getOrg(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
         MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
                 .checkout(BUYER_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
                         .putAllItems(cart)
@@ -478,7 +478,7 @@ public class MarketPlaceHandlerTest {
             return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_IN_STOCK));
         });
         when(itemDao.updateItemStock(any())).thenReturn(new ArrayList<>());
-        when(orgServiceHandler.getOrg(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
+        when(orgServiceHandler.getOrgByName(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
         MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
                 .checkout(BUYER_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
                         .putAllItems(cart)

@@ -122,7 +122,7 @@ public class MarketPlaceServiceHandler {
             // Process each organization's order separately in a batch.
             for (Map.Entry<String, List<Item>> itemsToCheckOut : orgIdToItemsMap.entrySet()) {
                 try {
-                    final Organization organization = orgServiceHandler.getOrg(itemsToCheckOut.getKey()).orElseThrow(
+                    final Organization organization = orgServiceHandler.getOrgByName(itemsToCheckOut.getKey()).orElseThrow(
                             () -> new IllegalArgumentException(String.format("OrgId %s is invalid",
                                     itemsToCheckOut.getKey())));
 

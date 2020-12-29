@@ -34,21 +34,21 @@ public class OrganizationRPCService extends OrganizationGrpc.OrganizationImplBas
     }
 
     @Override
-    public void getOrganization(OrganizationOuterClass.orgName request,
-                                io.grpc.stub.StreamObserver<OrganizationOuterClass.orgMetadata> responseObserver) {
+    public void getOrganization(OrganizationOuterClass.GetOrgRequest request,
+                                io.grpc.stub.StreamObserver<OrganizationOuterClass.GetOrgResult> responseObserver) {
         responseObserver.onNext(handler.getOrgRequest(request));
         responseObserver.onCompleted();
     }
 
     @Override
-    public void addOrganization(OrganizationOuterClass.orgMetadata request,
-                                io.grpc.stub.StreamObserver<OrganizationOuterClass.orgName> responseObserver) {
-        responseObserver.onNext(handler.addOrgRquest(request));
+    public void addOrganization(OrganizationOuterClass.OrgMetadata request,
+                                io.grpc.stub.StreamObserver<OrganizationOuterClass.AddOrgResult> responseObserver) {
+        responseObserver.onNext(handler.handleAddOrgRequest(request));
         responseObserver.onCompleted();
     }
 
     @Override
-    public void updateOrganization(OrganizationOuterClass.orgMetadata request,
+    public void updateOrganization(OrganizationOuterClass.OrgMetadata request,
                                 io.grpc.stub.StreamObserver<OrganizationOuterClass.OrgUpdateResult> responseObserver) {
         responseObserver.onNext(handler.partialUpdateRequest(request));
         responseObserver.onCompleted();
