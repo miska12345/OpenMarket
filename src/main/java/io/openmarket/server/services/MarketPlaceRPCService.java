@@ -28,4 +28,13 @@ public class MarketPlaceRPCService extends MarketPlaceGrpc.MarketPlaceImplBase {
         observer.onNext(this.marketPlaceServiceHandler.checkout(userId, request));
         observer.onCompleted();
     }
+
+    @Override
+    public void getAllOrders (@Nonnull final MarketPlaceProto.GetAllOrdersRequest request,
+                          @Nonnull final StreamObserver<MarketPlaceProto.GetAllOrdersResult> observer) {
+        final String userId = InterceptorConfig.USER_NAME_CONTEXT_KEY.get(Context.current());
+        log.info("Get order invoked by user {}", userId);
+        observer.onNext(this.marketPlaceServiceHandler.getOrders(userId, request));
+        observer.onCompleted();
+    }
 }

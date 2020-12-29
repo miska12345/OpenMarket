@@ -154,39 +154,36 @@ public class MarketPlaceServiceHandler {
                     }
                     order = generateOrderFromCheckOutItems(userId, organization,
                             itemsList, request.getItemsMap());
-                    final String transactionId = transactionServiceHandler.createPayment(userId,
+                    final TransactionServiceHandler.Stepper stepper = transactionServiceHandler.createPaymentStepper(userId,
                             TransactionProto.PaymentRequest.newBuilder()
-                            .setType(TransactionProto.PaymentRequest.Type.PAY)
-                            .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder()
-                                    .setCurrencyId(order.getCurrency())
-                                    .setAmount(order.getTotal())
-                                    .build())
-                            .setRecipientId(organization.getOrgName())
-                            .setNote(String.format("Order %s", order.getOrderId()))
-                            .build());
+                                    .setType(TransactionProto.PaymentRequest.Type.PAY)
+                                    .setMoneyAmount(TransactionProto.MoneyAmount.newBuilder()
+                                            .setCurrencyId(order.getCurrency())
+                                            .setAmount(order.getTotal())
+                                            .build())
+                                    .setRecipientId(organization.getOrgName())
+                                    .setNote(String.format("Order %s", order.getOrderId()))
+                                    .build()
+                            );
+                    final String transactionId = stepper.getTransaction().getTransactionId();
                     order.setTransactionId(transactionId);
+                    order.setStatus(OrderStatus.PENDING_PAYMENT);
+                    orderDao.save(order);
+                    stepper.commit();
 
                     // Wait for payment to complete.
                     final TransactionStatus status = getPaymentStatus(transactionId);
                     log.info("The status for transaction {} is {}", transactionId, status);
                     switch (status) {
                         case PENDING:
-                            // TODO: Probably not what's intended, need improvement
-                            order.setStatus(OrderStatus.PENDING_PAYMENT);
-                            orderDao.save(order);
                             actionRequiredOrders.add(convertOrderModelToGrpcOrder(order));
                             log.warn("Transaction {}'s status for order {} is pending",
                                     order.getTransactionId(), order.getOrderId());
                             break;
                         case COMPLETED:
-                            order.setStatus(OrderStatus.PAYMENT_CONFIRMED);
-                            orderDao.save(order);
                             successOrders.add(convertOrderModelToGrpcOrder(order));
                             break;
                         case ERROR:
-                            rollbackOrder(polishedRequest);
-
-                            // Add all items to failed list.
                             moveAllInvalidItems(itemsList.stream().map(Item::getItemID).collect(Collectors.toList()),
                                     failedItems, itemsList,
                                     MarketPlaceProto.FailedCheckOutCause.INSUFFICIENT_BALANCE);
@@ -288,8 +285,8 @@ public class MarketPlaceServiceHandler {
                         .quantity(orderItems.get(a.getItemID()))
                         .build()).collect(Collectors.toList())
                 )
-                .createdAt(currentDate)
-                .lastUpdatedAt(currentDate)
+                .createdAt(TimeUtils.parseDate(currentDate))
+                .lastUpdatedAt(TimeUtils.parseDate(currentDate))
                 .build();
     }
 
@@ -334,8 +331,8 @@ public class MarketPlaceServiceHandler {
                 )
                 .setTransactionId(order.getTransactionId())
                 .setStatus(MarketPlaceProto.OrderStatus.valueOf(order.getStatus().toString()))
-                .setLastUpdatedAt(order.getLastUpdatedAt())
-                .setCreatedAt(order.getCreatedAt())
+                .setLastUpdatedAt(TimeUtils.formatDate(order.getLastUpdatedAt()))
+                .setCreatedAt(TimeUtils.formatDate(order.getCreatedAt()))
                 .build();
     }
 
@@ -355,7 +352,7 @@ public class MarketPlaceServiceHandler {
                 .setBelongTo(item.getBelongTo())
                 .setItemPrice(item.getItemPrice())
                 .setItemDescription(item.getItemDescription())
-                .setItemId(String.valueOf(item.getItemID()))
+                .setItemId(item.getItemID())
                 .setCategory(item.getItemCategory())
                 .setItemImageLink(item.getItemImageLink())
                 .build();
