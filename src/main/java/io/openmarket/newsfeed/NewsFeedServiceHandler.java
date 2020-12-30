@@ -1,16 +1,14 @@
 package io.openmarket.newsfeed;
 
-import com.google.common.collect.ImmutableList;
-import io.openmarket.marketplace.MarketPlaceServiceHandler;
 import io.openmarket.marketplace.dao.ItemDao;
-import io.openmarket.marketplace.grpc.MarketPlaceProto;
 import io.openmarket.marketplace.model.Item;
 import io.openmarket.newsfeed.grpc.NewsFeedProto;
-import io.openmarket.newsfeed.grpc.NewsFeedProto.*;
+import io.openmarket.newsfeed.grpc.NewsFeedProto.ItemGrpc;
+import io.openmarket.newsfeed.grpc.NewsFeedProto.TopDealsRequest;
+import io.openmarket.newsfeed.grpc.NewsFeedProto.TopDealsResult;
 
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,7 +33,7 @@ public class NewsFeedServiceHandler {
                 .setBelongTo(item.getBelongTo())
                 .setItemPrice(item.getItemPrice())
                 .setItemDescription(item.getItemDescription())
-//                .setItemId(item.getItemID())
+                .setItemId(item.getItemID())
                 .setCategory(item.getItemCategory())
                 .setItemImageLink(item.getItemImageLink())
                 .setPurchasedCount(item.getPurchasedCount())
