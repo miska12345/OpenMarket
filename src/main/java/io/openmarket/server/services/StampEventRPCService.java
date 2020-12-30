@@ -4,6 +4,7 @@ import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 import io.openmarket.event.grpc.EventProto;
 import io.openmarket.event.grpc.StampEventGrpc;
+import io.openmarket.server.config.InterceptorConfig;
 import io.openmarket.stamp.service.StampEventServiceHandler;
 import lombok.NonNull;
 
@@ -46,9 +47,10 @@ public class StampEventRPCService extends StampEventGrpc.StampEventImplBase {
     }
 
     @Override
-    public void getOwnedEvent(@NonNull final EventProto.GetOwnedEventRequest request,
-                              @NonNull final StreamObserver<EventProto.GetOwnedEventResult> resultStreamObserver) {
-        resultStreamObserver.onNext(handler.handleGetOwnedEvent(Context.current(), request));
+    public void getEventList(@NonNull final EventProto.GetEventListRequest request,
+                             @NonNull final StreamObserver<EventProto.GetEventListResult> resultStreamObserver) {
+        final String userId = InterceptorConfig.USER_NAME_CONTEXT_KEY.get(Context.current());
+        resultStreamObserver.onNext(handler.handleGetEventList(userId, request));
         resultStreamObserver.onCompleted();
     }
 }

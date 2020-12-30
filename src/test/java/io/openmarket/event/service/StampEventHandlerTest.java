@@ -1,8 +1,6 @@
 package io.openmarket.event.service;
 
-import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
-import com.google.common.collect.ImmutableMap;
 import io.openmarket.event.grpc.EventProto;
 import io.openmarket.stamp.dao.dynamodb.StampEventDao;
 import io.openmarket.stamp.model.EventOwnerType;
@@ -51,14 +49,14 @@ public class StampEventHandlerTest {
     }
 
     @Test
-    public void when_Owned_Event_Is_Not_Empty_Then_Return_All() {
+    public void test_Get_Event_List_Non_Empty() {
         Mockito.when(eventDao.getEventIdsByOwner(eq(OWNER_ID), any(), anyInt(), anyCollection()))
                 .thenAnswer((Answer) invocation -> {
             Collection<String> result = (Collection<String>) invocation.getArguments()[3];
             for (int i = 0; i < (int) invocation.getArgument(2); i++) {
                 result.add(String.valueOf(i));
             }
-            return ImmutableMap.of("abc", new AttributeValue("cake"));
+            return null;
         });
         when(eventDao.batchLoad(anyCollection())).thenAnswer((Answer) invocation -> {
             Collection<String> ids = (Collection<String>) invocation.getArguments()[0];
@@ -68,25 +66,64 @@ public class StampEventHandlerTest {
             }
             return events;
         });
-        EventProto.GetOwnedEventResult result = stampEventServiceHandler.getOwnedEvent(OWNER_ID,
-                EventProto.GetOwnedEventRequest.newBuilder().setCount(5).build()
+        EventProto.GetEventListResult result = stampEventServiceHandler.handleGetEventList(OWNER_ID,
+                EventProto.GetEventListRequest.newBuilder()
+                        .setOwnerID(OWNER_ID)
+                        .setMaxCount(5)
+                        .build()
         );
-        assertEquals(result.getEventsCount(), 5);
-        assertEquals(result.getLastEvaluatedKey(),
-                "{\"abc\":{\"s\":\"cake\"}}");
+        assertEquals(5, result.getEventsCount());
     }
 
     @Test
-    public void when_Owned_Event_Is_Empty_Then_Return_Nothing() {
-        Mockito.when(eventDao.getEventIdsByOwner(eq(OWNER_ID), any(), anyInt(), anyCollection()))
-                .thenAnswer((Answer) invocation -> null);
-        when(eventDao.batchLoad(anyCollection())).thenAnswer((Answer) invocation -> new ArrayList<>());
-        EventProto.GetOwnedEventResult result = stampEventServiceHandler.getOwnedEvent(OWNER_ID,
-                EventProto.GetOwnedEventRequest.newBuilder().setCount(5).build()
+    public void test_Get_Event_List_Empty() {
+        EventProto.GetEventListResult result = stampEventServiceHandler.handleGetEventList(OWNER_ID,
+                EventProto.GetEventListRequest.newBuilder()
+                        .setOwnerID(OWNER_ID)
+                        .setMaxCount(5)
+                        .build()
         );
-        assertEquals(result.getEventsCount(), 0);
-        assertEquals(result.getLastEvaluatedKey(), "null");
+        assertEquals(0, result.getEventsCount());
     }
+
+
+//    @Test
+//    public void when_Owned_Event_Is_Not_Empty_Then_Return_All() {
+//        Mockito.when(eventDao.getEventIdsByOwner(eq(OWNER_ID), any(), anyInt(), anyCollection()))
+//                .thenAnswer((Answer) invocation -> {
+//            Collection<String> result = (Collection<String>) invocation.getArguments()[3];
+//            for (int i = 0; i < (int) invocation.getArgument(2); i++) {
+//                result.add(String.valueOf(i));
+//            }
+//            return ImmutableMap.of("abc", new AttributeValue("cake"));
+//        });
+//        when(eventDao.batchLoad(anyCollection())).thenAnswer((Answer) invocation -> {
+//            Collection<String> ids = (Collection<String>) invocation.getArguments()[0];
+//            List<StampEvent> events = new ArrayList<>();
+//            for (int i = 0; i < ids.size(); i++) {
+//                events.add(getEventWithId(String.valueOf(i)));
+//            }
+//            return events;
+//        });
+//        EventProto.GetOwnedEventResult result = stampEventServiceHandler.getOwnedEvent(OWNER_ID,
+//                EventProto.GetOwnedEventRequest.newBuilder().setCount(5).build()
+//        );
+//        assertEquals(result.getEventsCount(), 5);
+//        assertEquals(result.getLastEvaluatedKey(),
+//                "{\"abc\":{\"s\":\"cake\"}}");
+//    }
+//
+//    @Test
+//    public void when_Owned_Event_Is_Empty_Then_Return_Nothing() {
+//        Mockito.when(eventDao.getEventIdsByOwner(eq(OWNER_ID), any(), anyInt(), anyCollection()))
+//                .thenAnswer((Answer) invocation -> null);
+//        when(eventDao.batchLoad(anyCollection())).thenAnswer((Answer) invocation -> new ArrayList<>());
+//        EventProto.GetOwnedEventResult result = stampEventServiceHandler.getOwnedEvent(OWNER_ID,
+//                EventProto.GetOwnedEventRequest.newBuilder().setCount(5).build()
+//        );
+//        assertEquals(result.getEventsCount(), 0);
+//        assertEquals(result.getLastEvaluatedKey(), "null");
+//    }
 
     @Test
     public void when_EventID_is_Invalid_Then_Return_Invalid_Event_Status() {

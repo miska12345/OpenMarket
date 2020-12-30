@@ -5,9 +5,6 @@ import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
-import com.google.gson.reflect.TypeToken;
 import io.grpc.Context;
 import io.openmarket.event.grpc.EventProto;
 import io.openmarket.event.grpc.EventProto.CreateEventRequest;
@@ -25,11 +22,9 @@ import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
 
 import javax.inject.Inject;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -38,7 +33,9 @@ import static io.openmarket.config.StampEventConfig.*;
 @Log4j2
 public class StampEventServiceHandler {
     private static final String ILLEGAL_ARGUMENTS_ERROR_MSG = "The request contains invalid parameters";
-    private static final Gson GSON = new Gson();
+
+    // The event list size to use if the size specified in the request is invalid.
+    private static final int DEFAULT_EVENT_LIST_SIZE = 10;
 
     private final StampEventDao eventDao;
     private final TransactionServiceHandler transactionServiceHandler;
@@ -75,31 +72,17 @@ public class StampEventServiceHandler {
         return getEvent(userId, request);
     }
 
-    public EventProto.GetOwnedEventResult handleGetOwnedEvent(@NonNull final Context context,
-                                                              @NonNull final EventProto.GetOwnedEventRequest request) {
-        final String userId = InterceptorConfig.USER_NAME_CONTEXT_KEY.get(context);
-        return getOwnedEvent(userId, request);
-    }
-
-    public EventProto.GetOwnedEventResult getOwnedEvent(String userId, EventProto.GetOwnedEventRequest request) {
+    public EventProto.GetEventListResult handleGetEventList(@NonNull final String userID,
+                                                      @NonNull final EventProto.GetEventListRequest request) {
         final List<String> eventIds = new ArrayList<>();
-        final Type type = new TypeToken<Map<String, String>>(){}.getType();
-        final int count = request.getCount() > 0 ? request.getCount() : 1;
+        final int maxCount = request.getMaxCount() < 0 ? DEFAULT_EVENT_LIST_SIZE : request.getMaxCount();
         final List<StampEvent> loadResult;
-        Map<String, AttributeValue> exclusiveStartKey;
-        try {
-            exclusiveStartKey = GSON.fromJson(request.getExclusiveStartKey(), type);
-        } catch (JsonSyntaxException e) {
-            exclusiveStartKey = null;
-        }
-        final Map<String, AttributeValue> lastEvaluatedKey = eventDao.getEventIdsByOwner(userId, exclusiveStartKey,
-                count, eventIds);
+        log.info("User {} requested the event list for {}", userID, request.getOwnerID());
+        // TODO: Implement pagination with exclusiveStartKey
+        eventDao.getEventIdsByOwner(request.getOwnerID(), null, maxCount, eventIds);
         loadResult = eventIds.isEmpty() ? ImmutableList.of() : eventDao.batchLoad(eventIds);
-        log.info("User {} got owned events with size {}", userId, loadResult.size());
-        return EventProto.GetOwnedEventResult.newBuilder()
+        return EventProto.GetEventListResult.newBuilder()
                 .addAllEvents(loadResult.stream().map(this::convertToGRPCEvent).collect(Collectors.toList()))
-                .setError(EventProto.Error.NOTHING)
-                .setLastEvaluatedKey(GSON.toJson(lastEvaluatedKey))
                 .build();
     }
 
