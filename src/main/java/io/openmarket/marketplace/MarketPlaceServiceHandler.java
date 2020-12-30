@@ -79,7 +79,6 @@ public class MarketPlaceServiceHandler {
         Map<String, AttributeValue> exclusiveStartKey = MiscUtils.getExclusiveStartKey(request.getExclusiveStartKey())
                 .orElse(null);
         if (request.getRole().equals(MarketPlaceProto.Role.BUYER)) {
-            log.info("HEre");
             exclusiveStartKey = orderDao.getOrderByBuyer(userId, exclusiveStartKey, orderIds, request.getMaxCount());
         } else {
             exclusiveStartKey = orderDao.getOrderBySeller(userId, exclusiveStartKey, orderIds, request.getMaxCount());
@@ -105,55 +104,69 @@ public class MarketPlaceServiceHandler {
                     .setError(MarketPlaceProto.Error.INTERNAL_SERVICE_ERROR)
                     .build();
         }
-
+        // A list containing orders that have successfully checked out.
         final List<MarketPlaceProto.Order> successOrders = new ArrayList<>();
-        final Map<Integer, MarketPlaceProto.FailedCheckOutCause> failedItems = new HashMap<>();
-        final List<Integer> batchFailedItemIds = new ArrayList<>();
+
+        // A list of failed items.
+        final List<MarketPlaceProto.FailedItem> failedItems = new ArrayList<>();
+
+        // A list of orders with unknown payment status (non-empty iff payment(s) time out).
         final List<MarketPlaceProto.Order> actionRequiredOrders = new ArrayList<>();
         try {
-            // Fetch all items in a batch, then filter out the invalid ones.
-            List<Item> itemsList = itemDao.batchLoad(request.getItemsMap().keySet(), batchFailedItemIds);
-            moveAllInvalidItems(batchFailedItemIds, failedItems, itemsList,
+            // Fetch all items in a batch.
+            final List<Integer> batchFailedItemIds = new ArrayList<>();
+            List<Item> itemList = itemDao.batchLoad(request.getItemsMap().keySet(), batchFailedItemIds);
+            if (!batchFailedItemIds.isEmpty()) {
+                log.warn("Some items failed to load: {}", batchFailedItemIds);
+            }
+
+            // Filter out the invalid ones.
+            moveAllInvalidItems(batchFailedItemIds, failedItems, itemList, new HashMap<>(),
                     MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST);
 
+            // Use a table to speed up lookup.
+            final Map<Integer, MarketPlaceProto.CheckOutItem> itemIndex = convertItemListToCheckOutItemMap(itemList,
+                    request.getItemsMap());
+
             // A map of orgId to list of items sold by the particular org.
-            final Map<String, List<Item>> orgIdToItemsMap = mapOrgIdToItems(itemsList);
+            final Map<String, List<Item>> orgIdToItemsMap = mapOrgIdToItems(itemList);
 
             // Process each organization's order separately in a batch.
             for (Map.Entry<String, List<Item>> itemsToCheckOut : orgIdToItemsMap.entrySet()) {
                 try {
-                    final Organization organization = orgServiceHandler.getOrgByName(itemsToCheckOut.getKey()).orElseThrow(
-                            () -> new IllegalArgumentException(String.format("OrgId %s is invalid",
+                    final Organization organization = orgServiceHandler.getOrgByName(itemsToCheckOut.getKey())
+                            .orElseThrow(() -> new IllegalArgumentException(String.format("OrgId %s is invalid",
                                     itemsToCheckOut.getKey())));
 
-                    itemsList = itemsToCheckOut.getValue();
+                    itemList = itemsToCheckOut.getValue();
 
                     // A map of itemID to quantity.
-                    final Map<Integer, Integer> polishedRequest = itemsToCheckOut.getValue().stream()
+                    final Map<Integer, Integer> polishedRequest = itemList.stream()
                             .collect(Collectors.toMap(Item::getItemID, a -> request.getItemsMap().get(a.getItemID())));
 
                     // Avoids unwanted throttling by using a temporary order to check if user has enough balance.
                     Order order = generateOrderFromCheckOutItems(userId, organization,
-                            itemsList, request.getItemsMap());
+                            itemList, request.getItemsMap());
                     if (transactionServiceHandler.getBalanceForCurrency(userId, order.getCurrency()) < order.getTotal()) {
-                        log.info("User {} doesn't have enough {} to check out order {}", userId, order.getCurrency(), itemsList);
-                        moveAllInvalidItems(itemsList.stream().map(Item::getItemID).collect(Collectors.toList()),
-                                failedItems, itemsList,
+                        log.info("User {} doesn't have enough {} to check out order {}", userId, order.getCurrency(), itemList);
+                        moveAllInvalidItems(itemList.stream().map(Item::getItemID).collect(Collectors.toList()),
+                                failedItems, itemList, itemIndex,
                                 MarketPlaceProto.FailedCheckOutCause.INSUFFICIENT_BALANCE);
                         continue;
                     }
 
+                    // Update stock quantity, then filter out of stock items.
                     final List<Integer> updateFailedItemIds = itemDao.updateItemStock(polishedRequest);
-                    moveAllInvalidItems(updateFailedItemIds, failedItems, itemsList,
+                    moveAllInvalidItems(updateFailedItemIds, failedItems, itemList, itemIndex,
                             MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK);
 
-                    if (itemsList.isEmpty()) {
+                    if (itemList.isEmpty()) {
                         log.info("All items are out of stock or invalid. UpdatedFailedItems: {}",
                                 updateFailedItemIds);
                         continue;
                     }
                     order = generateOrderFromCheckOutItems(userId, organization,
-                            itemsList, request.getItemsMap());
+                            itemList, request.getItemsMap());
                     final TransactionServiceHandler.Stepper stepper = transactionServiceHandler.createPaymentStepper(userId,
                             TransactionProto.PaymentRequest.newBuilder()
                                     .setType(TransactionProto.PaymentRequest.Type.PAY)
@@ -184,17 +197,19 @@ public class MarketPlaceServiceHandler {
                             successOrders.add(convertOrderModelToGrpcOrder(order));
                             break;
                         case ERROR:
-                            moveAllInvalidItems(itemsList.stream().map(Item::getItemID).collect(Collectors.toList()),
-                                    failedItems, itemsList,
+                            moveAllInvalidItems(itemList.stream().map(Item::getItemID).collect(Collectors.toList()),
+                                    failedItems, itemList, itemIndex,
                                     MarketPlaceProto.FailedCheckOutCause.INSUFFICIENT_BALANCE);
                             break;
                         default:
                             log.error("Unhandled payment status {}", status);
                     }
                 } catch (IllegalArgumentException e) {
-                    orgIdToItemsMap.get(itemsToCheckOut.getKey()).forEach(x -> failedItems.put(x.getItemID(),
-                            MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST));
-                    log.error("User {} requested check out invalid item with orgId {}, request: {}", userId,
+                    // The org cannot be found, so all items sold by this org are considered not-to-exist.
+                    moveAllInvalidItems(itemsToCheckOut.getValue().stream().map(Item::getItemID)
+                                    .collect(Collectors.toList()),
+                            failedItems, itemList, itemIndex, MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST);
+                    log.error("User {} requested check out invalid items belonging to org {}, request: {}", userId,
                             itemsToCheckOut.getKey(), request);
                 }
             }
@@ -203,7 +218,7 @@ public class MarketPlaceServiceHandler {
             return MarketPlaceProto.CheckOutResult.newBuilder()
                     .setError(MarketPlaceProto.Error.NONE)
                     .addAllSuccessOrders(successOrders)
-                    .putAllFailedItems(failedItems)
+                    .addAllFailedItems(failedItems)
                     .addAllActionRequiredOrders(actionRequiredOrders)
                     .build();
         } catch (Exception e) {
@@ -214,19 +229,18 @@ public class MarketPlaceServiceHandler {
         }
     }
 
-    private boolean isGetOrderRequestValid(final MarketPlaceProto.GetAllOrdersRequest request) {
-        return request.getMaxCount() > 0;
+    @VisibleForTesting
+    protected static Map<Integer, MarketPlaceProto.CheckOutItem> convertItemListToCheckOutItemMap(
+            @NonNull final List<Item> itemList, @NonNull final Map<Integer, Integer> quantityMap) {
+        final Map<Integer, MarketPlaceProto.CheckOutItem> result = new HashMap<>();
+        for (Item item : itemList) {
+            result.put(item.getItemID(), convertItemToCheckOutItem(item, quantityMap.get(item.getItemID())));
+        }
+        return result;
     }
 
-
-    @VisibleForTesting
-    protected void rollbackOrder(Map<Integer, Integer> itemIdsToQuantity) {
-        itemIdsToQuantity.keySet().forEach(a -> itemIdsToQuantity.put(a, -1 * itemIdsToQuantity.get(a)));
-        List<Integer> updatedFailedItemInRollback = itemDao.updateItemStock(itemIdsToQuantity);
-        if (!updatedFailedItemInRollback.isEmpty()) {
-            log.error("Failed to rollback for items {} with map {}", updatedFailedItemInRollback,
-                    itemIdsToQuantity);
-        }
+    private boolean isGetOrderRequestValid(final MarketPlaceProto.GetAllOrdersRequest request) {
+        return request.getMaxCount() > 0;
     }
 
     private TransactionStatus getPaymentStatus(String transactionId) {
@@ -254,14 +268,49 @@ public class MarketPlaceServiceHandler {
         return true;
     }
 
-    // Move invalid items out of loadedItems and into the failedItems map with the given cause.
+    // Move invalid items out of loadedItems and into the failedItems with the given cause.
     @VisibleForTesting
     protected static void moveAllInvalidItems(@NonNull final Collection<Integer> failedItemIdsFromBatch,
-                                            @NonNull final Map<Integer, MarketPlaceProto.FailedCheckOutCause> failedItems,
+                                            @NonNull final List<MarketPlaceProto.FailedItem> failedItems,
                                             @NonNull final List<Item> loadedItems,
+                                            @NonNull final Map<Integer, MarketPlaceProto.CheckOutItem> itemIndex,
                                             MarketPlaceProto.FailedCheckOutCause cause) {
-        failedItemIdsFromBatch.forEach(a -> failedItems.put(a, cause));
-        loadedItems.removeIf(a -> failedItemIdsFromBatch.contains(a.getItemID()));
+
+        for (int id : failedItemIdsFromBatch) {
+            if (!itemIndex.containsKey(id) && cause.equals(MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK)) {
+                System.err.println("Cannot find " + id + " " + cause);
+            } else {
+                System.err.println("Found " + id + " " + cause);
+            }
+            final MarketPlaceProto.CheckOutItem item = itemIndex.getOrDefault(id, MarketPlaceProto.CheckOutItem.newBuilder()
+                    .setItemId(id)
+                    .build());
+            System.out.println("processing " + id + " with cause " + cause);
+            failedItems.add(MarketPlaceProto.FailedItem.newBuilder()
+                    .setItem(item)
+                    .setCause(cause)
+                    .build());
+        }
+        deleteAllFromItemList(failedItemIdsFromBatch, loadedItems, itemIndex);
+    }
+
+    protected  static void deleteAllFromItemList(@NonNull final Collection<Integer> idsToDelete,
+                                                 @NonNull final List<Item> loadedItems,
+                                                 @NonNull final Map<Integer, MarketPlaceProto.CheckOutItem> itemIndex) {
+        loadedItems.removeIf(a -> idsToDelete.contains(a.getItemID()));
+        for (int id : idsToDelete) {
+            itemIndex.remove(id);
+        }
+    }
+
+    protected  static MarketPlaceProto.CheckOutItem convertItemToCheckOutItem(@NonNull final Item item, int quantity) {
+        return MarketPlaceProto.CheckOutItem.newBuilder()
+                .setItemId(item.getItemID())
+                .setItemName(item.getItemName())
+                .setItemPrice(item.getItemPrice())
+                .setItemPrice(item.getItemPrice())
+                .setQuantity(quantity)
+                .build();
     }
 
     @VisibleForTesting
@@ -322,7 +371,7 @@ public class MarketPlaceServiceHandler {
                 .setCurrency(order.getCurrency())
                 .setTotalAmount(order.getTotal())
                 .addAllItems(
-                        order.getItems().stream().map(a -> MarketPlaceProto.OrderedItem.newBuilder()
+                        order.getItems().stream().map(a -> MarketPlaceProto.CheckOutItem.newBuilder()
                                 .setItemId(a.getItemId())
                                 .setItemName(a.getItemName())
                                 .setItemPrice(a.getPrice())

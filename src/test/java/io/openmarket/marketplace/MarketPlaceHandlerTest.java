@@ -71,7 +71,7 @@ public class MarketPlaceHandlerTest {
     private static final Item INVALID_ITEM = Item.builder().itemID(5).itemName("XXX")
             .belongTo("InvalidOrganization").itemPrice(10.0).stock(100).build();
 
-    private static final Item INVALID_ITEM_2 = Item.builder().itemID(5).itemName("YYY")
+    private static final Item INVALID_ITEM_2 = Item.builder().itemID(6).itemName("YYY")
             .belongTo(ORGANIZATION_A.getOrgName()).itemPrice(10.0).stock(100).build();
 
     private static final Map<Integer, Double> ITEM_ID_TO_PRICE_MAP = ImmutableMap.of(
@@ -126,16 +126,24 @@ public class MarketPlaceHandlerTest {
     }
 
     @Test
+    public void testConvertItemToCheckOutItem() {
+        Map<Integer, MarketPlaceProto.CheckOutItem> result = MarketPlaceServiceHandler.convertItemListToCheckOutItemMap(ImmutableList.of(
+                Item.builder().itemID(1).build(),
+                Item.builder().itemID(2).build()
+        ), ImmutableMap.of(1, 1, 2, 2));
+        assertEquals(2, result.size());
+    }
+
+    @Test
     public void testMoveAllInvalidItems() {
         List<Integer> failedItemIds = Arrays.asList(1, 2);
-        Map<Integer, MarketPlaceProto.FailedCheckOutCause> causeMap = new HashMap<>();
+        List<MarketPlaceProto.FailedItem> failedItems = new ArrayList<>();
         List<Item> items = new ArrayList<>(Arrays.asList(ORG_A_ITEM_IN_STOCK, ORG_A_ITEM_IN_STOCK_2));
-        MarketPlaceServiceHandler.moveAllInvalidItems(failedItemIds, causeMap, items, MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK);
+        MarketPlaceServiceHandler.moveAllInvalidItems(failedItemIds, failedItems, items, new HashMap<>(),
+                MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK);
         assertTrue(items.isEmpty());
-        assertEquals(2, causeMap.size());
-        for (Map.Entry<Integer, MarketPlaceProto.FailedCheckOutCause> entry : causeMap.entrySet()) {
-            assertEquals(MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK, entry.getValue());
-        }
+        assertEquals(2, failedItems.size());
+        failedItems.forEach(a -> assertEquals(MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK, a.getCause()));
     }
 
     @Test
@@ -151,14 +159,6 @@ public class MarketPlaceHandlerTest {
         Map<Integer, Integer> itemIdToQuantity = ImmutableMap.of(ORG_A_ITEM_IN_STOCK.getItemID(), 1, ORG_A_ITEM_IN_STOCK_2.getItemID(), 1);
         assertEquals(ORG_A_ITEM_IN_STOCK.getItemPrice() + ORG_A_ITEM_IN_STOCK_2.getItemPrice(),
                 MarketPlaceServiceHandler.calculateTotalCost(items, itemIdToQuantity));
-    }
-
-    @Test
-    public void testRollback() {
-        Map<Integer, Integer> rollbackMap = new HashMap<>();
-        rollbackMap.put(1, 1);
-        marketPlaceServiceHandler.rollbackOrder(rollbackMap);
-        verify(itemDao, times(1)).updateItemStock(argThat(a -> a.get(1) < 0));
     }
 
     @Test
@@ -255,7 +255,7 @@ public class MarketPlaceHandlerTest {
         verify(orderDao, times(0)).save(any());
         verify(transactionServiceHandler, times(0)).createPayment(anyString(), any());
         assertEquals(MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK,
-                result.getFailedItemsMap().get(ORG_A_ITEM_OUT_OF_STOCK.getItemID()));
+                result.getFailedItems(0).getCause());
     }
 
     @Test
@@ -297,7 +297,7 @@ public class MarketPlaceHandlerTest {
         assertResultCountMatches(0, 1, 0, result);
         verify(orderDao, times(0)).save(any());
         verify(transactionServiceHandler, times(0)).createPayment(anyString(), any());
-        assertEquals(MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST, result.getFailedItemsMap().get(INVALID_ITEM.getItemID()));
+        assertEquals(MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST, result.getFailedItemsList().get(0).getCause());
     }
 
     @Test
@@ -322,7 +322,7 @@ public class MarketPlaceHandlerTest {
         verify(transactionServiceHandler, times(0)).createPayment(anyString(), any());
         verify(itemDao, times(0)).updateItemStock(anyMap());
         assertEquals(MarketPlaceProto.FailedCheckOutCause.ITEM_DOES_NOT_EXIST,
-                result.getFailedItemsMap().get(INVALID_ITEM_2.getItemID()));
+                result.getFailedItemsList().get(0).getCause());
     }
 
     @Test
@@ -348,7 +348,7 @@ public class MarketPlaceHandlerTest {
 //                .equals(OrderStatus.PAYMENT_CONFIRMED) && checkOrderIsCorrect(ImmutableMap.of(ORG_A_ITEM_IN_STOCK.getItemID(), 1,
 //                ORG_A_ITEM_IN_STOCK_2.getItemID(), 1), a)));
         assertEquals(MarketPlaceProto.FailedCheckOutCause.OUT_OF_STOCK,
-                result.getFailedItemsMap().get(ORG_A_ITEM_OUT_OF_STOCK.getItemID()));
+                result.getFailedItemsList().get(0).getCause());
     }
 
     @Test
@@ -370,9 +370,6 @@ public class MarketPlaceHandlerTest {
 
         assertEquals(MarketPlaceProto.Error.NONE, result.getError());
         assertResultCountMatches(2, 0, 0, result);
-//        verify(orderDao, times(2)).save(argThat(a -> a.getStatus()
-//                .equals(OrderStatus.PAYMENT_CONFIRMED)));
-//        verify(transactionServiceHandler, times(2)).createPayment(eq(BUYER_ID), any());
     }
 
     @Test
@@ -382,23 +379,24 @@ public class MarketPlaceHandlerTest {
                 ORG_A_ITEM_OUT_OF_STOCK.getItemID(), 1,
                 INVALID_ITEM.getItemID(), 1);
         mockSuccessTransaction();
-        when(itemDao.batchLoad(anyCollection(), any())).thenAnswer(a -> {
-            return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_IN_STOCK, ORG_B_ITEM_IN_STOCK, ORG_A_ITEM_OUT_OF_STOCK, INVALID_ITEM));
-        });
         when(orgServiceHandler.getOrgByName(ORGANIZATION_A.getOrgName())).thenReturn(Optional.of(ORGANIZATION_A));
         when(orgServiceHandler.getOrgByName(ORGANIZATION_B.getOrgName())).thenReturn(Optional.of(ORGANIZATION_B));
         when(itemDao.batchLoad(anyCollection(), any())).thenAnswer(a -> {
             Collection<Integer> failedItemID = a.getArgument(1);
             failedItemID.add(INVALID_ITEM.getItemID());
-            return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_IN_STOCK, ORG_B_ITEM_IN_STOCK));
+            return new ArrayList<>(ImmutableList.of(ORG_A_ITEM_IN_STOCK, ORG_B_ITEM_IN_STOCK, ORG_A_ITEM_OUT_OF_STOCK));
         });
-        when(itemDao.updateItemStock(any())).thenReturn(new ArrayList<>(ImmutableList.of(ORG_A_ITEM_OUT_OF_STOCK.getItemID())));
+        when(itemDao.updateItemStock(argThat(a -> a.containsKey(ORG_A_ITEM_OUT_OF_STOCK.getItemID()))))
+                .thenReturn(new ArrayList<>(ImmutableList.of(ORG_A_ITEM_OUT_OF_STOCK.getItemID())));
 
         MarketPlaceProto.CheckOutResult result = marketPlaceServiceHandler
                 .checkout(BUYER_ID, MarketPlaceProto.CheckOutRequest.newBuilder()
                         .putAllItems(cart)
                         .build());
 
+        for (MarketPlaceProto.FailedItem failedItem : result.getFailedItemsList()) {
+            System.out.println(failedItem.getCause());
+        }
         assertEquals(MarketPlaceProto.Error.NONE, result.getError());
         assertResultCountMatches(2, 2, 0, result);
 //        verify(orderDao, times(2)).save(argThat(a -> a.getStatus()
@@ -441,7 +439,7 @@ public class MarketPlaceHandlerTest {
         verify(transactionServiceHandler, times(0)).createPayment(anyString(), any());
         verify(itemDao, times(0)).updateItemStock(any());
         assertEquals(MarketPlaceProto.FailedCheckOutCause.INSUFFICIENT_BALANCE,
-                result.getFailedItemsMap().get(ORG_A_ITEM_IN_STOCK.getItemID()));
+                result.getFailedItemsList().get(0).getCause());
     }
 
     @Test
@@ -464,7 +462,7 @@ public class MarketPlaceHandlerTest {
 //        verify(orderDao, times(0)).save(any());
 //        verify(itemDao, times(2)).updateItemStock(any());
         assertEquals(MarketPlaceProto.FailedCheckOutCause.INSUFFICIENT_BALANCE,
-                result.getFailedItemsMap().get(ORG_A_ITEM_IN_STOCK.getItemID()));
+                result.getFailedItemsList().get(0).getCause());
     }
 
     @Test
